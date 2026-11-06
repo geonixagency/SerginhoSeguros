@@ -30,11 +30,37 @@ import { messageDTO, ruleDTO, templateDTO } from "../../lib/serialize";
 import { getEvolution } from "./evolution";
 import { countSentToday, createAndEnqueue, getSettings } from "./service";
 import { getMessagesQueue } from "./queue";
-import { primeiroNome, renderTemplate } from "./template";
+import { primeiroNome, renderTemplate, type TemplateVars } from "./template";
 import { runRulesTick } from "./engine";
+import { formatBr, formatMoneyBr, toIsoDate } from "../../lib/dates";
 import { vigenteWhere } from "../policies/rules";
 
 const IdParams = z.object({ id: z.string().min(1) });
+
+type BroadcastClient = {
+  nome: string;
+  policies: {
+    numero: string | null;
+    proposta: string | null;
+    insurer: { nome: string };
+    items: { placa: string | null }[];
+    installments: { valor: Prisma.Decimal | null; vencimento: Date }[];
+  }[];
+};
+
+/** Variáveis do disparo em massa: nome + dados da apólice vigente mais próxima do vencimento. */
+export function broadcastVars(c: BroadcastClient): TemplateVars {
+  const p = c.policies[0];
+  const inst = p?.installments[0];
+  return {
+    nome: primeiroNome(c.nome),
+    seguradora: p?.insurer.nome ?? "",
+    apolice: p?.numero ?? p?.proposta ?? "",
+    placa: p?.items[0]?.placa ?? "",
+    valor: formatMoneyBr(inst?.valor?.toFixed(2)),
+    vencimento: inst ? formatBr(toIsoDate(inst.vencimento)) : "",
+  };
+}
 
 export default async function messagingRoutes(app: FastifyInstance) {
   // ------------------------------------------------------------ instância
@@ -179,9 +205,17 @@ export default async function messagingRoutes(app: FastifyInstance) {
   // ------------------------------------------------------------ disparo em massa
   app.post("/broadcast", { onRequest: [app.requireRole("ADMIN")] }, async (req): Promise<BroadcastResponse> => {
     const input = parse(BroadcastSchema, req.body);
-    const template = await prisma.messageTemplate.findUnique({ where: { id: input.templateId } });
-    if (!template || !template.ativo) throw notFound("Template");
-    if (template.anexarBoleto) throw badRequest("Templates com boleto anexo só podem ser usados pelas réguas");
+    let conteudoBase: string;
+    let templateId: string | null = null;
+    if (input.templateId) {
+      const template = await prisma.messageTemplate.findUnique({ where: { id: input.templateId } });
+      if (!template || !template.ativo) throw notFound("Template");
+      if (template.anexarBoleto) throw badRequest("Templates com boleto anexo só podem ser usados pelas réguas");
+      conteudoBase = template.conteudo;
+      templateId = template.id;
+    } else {
+      conteudoBase = input.conteudo!;
+    }
     const f = input.filtro;
     const policyFilter: Prisma.PolicyWhereInput = {
       ...vigenteWhere(),
@@ -195,7 +229,28 @@ export default async function messagingRoutes(app: FastifyInstance) {
       ...(f.clientIds?.length ? { id: { in: f.clientIds } } : {}),
       ...(usaFiltroApolice ? { policies: { some: policyFilter } } : {}),
     };
-    const clients = await prisma.client.findMany({ where, select: { id: true, nome: true, telefone: true, optOut: true } });
+    const clients = await prisma.client.findMany({
+      where,
+      select: {
+        id: true,
+        nome: true,
+        telefone: true,
+        optOut: true,
+        // apólice vigente mais próxima do fim (respeitando o filtro) para preencher as {{variaveis}}
+        policies: {
+          where: policyFilter,
+          orderBy: { fimVigencia: "asc" },
+          take: 1,
+          select: {
+            numero: true,
+            proposta: true,
+            insurer: { select: { nome: true } },
+            items: { where: { placa: { not: null } }, select: { placa: true }, take: 1 },
+            installments: { where: { status: { in: ["PENDENTE", "ATRASADO"] } }, orderBy: { vencimento: "asc" }, take: 1, select: { valor: true, vencimento: true } },
+          },
+        },
+      },
+    });
     const semTelefone = clients.filter((c) => !c.telefone).length;
     const optOut = clients.filter((c) => c.telefone && c.optOut).length;
     const alvo = clients.filter((c) => c.telefone && !c.optOut);
@@ -206,13 +261,18 @@ export default async function messagingRoutes(app: FastifyInstance) {
       await createAndEnqueue({
         clientId: c.id,
         telefone: c.telefone!,
-        conteudo: renderTemplate(template.conteudo, { nome: primeiroNome(c.nome) }),
-        templateId: template.id,
+        conteudo: renderTemplate(conteudoBase, broadcastVars(c)),
+        templateId,
         broadcastId,
         dedupeKey: `broadcast-${broadcastId}-${c.id}`,
       });
     }
-    await audit(req, "DISPARO_EM_MASSA", "MessageTemplate", template.id, null, { broadcastId, total: alvo.length, filtro: f });
+    await audit(req, "DISPARO_EM_MASSA", "MessageTemplate", templateId ?? broadcastId, null, {
+      broadcastId,
+      total: alvo.length,
+      filtro: f,
+      ...(templateId ? {} : { personalizado: true }),
+    });
     return { broadcastId, total: alvo.length, ignorados: { semTelefone, optOut }, dryRun: false };
   });
 

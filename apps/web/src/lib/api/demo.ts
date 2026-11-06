@@ -20,6 +20,7 @@ import type {
   InstallmentsDue,
   Lead,
   MessageRule,
+  MessageTemplate,
   Paginated,
   ParseResult,
   Quote,
@@ -418,6 +419,17 @@ route("PATCH", "/messaging/instance", ({ d, body }) => {
   return d.instance;
 });
 route("GET", "/messaging/templates", ({ d }) => d.templates);
+route("POST", "/messaging/templates", ({ d, body }): MessageTemplate => {
+  const b = body as { nome?: string; texto?: string };
+  const nome = (b.nome ?? "").trim();
+  const texto = (b.texto ?? "").trim();
+  if (nome.length < 2 || nome.length > 80) throw new DemoHttpError(400, "Dê um nome de 2 a 80 caracteres ao template.");
+  if (!texto || texto.length > 4000) throw new DemoHttpError(400, "Escreva o texto da mensagem (até 4000 caracteres).");
+  if (d.templates.some((t) => t.nome.toLowerCase() === nome.toLowerCase())) throw new DemoHttpError(409, "Já existe um template com esse nome.");
+  const t: MessageTemplate = { id: `tpl-${Date.now()}`, nome, texto, anexarBoleto: false };
+  d.templates.push(t);
+  return t;
+});
 route("GET", "/messaging/rules", ({ d }) => d.rules);
 route("PATCH", "/messaging/rules/:id", ({ d, params, body }): MessageRule => {
   const r = d.rules.find((x) => x.id === params.id);
@@ -436,15 +448,19 @@ function filterClients(d: DemoDB, f: BroadcastFilter) {
       return !!nome && c.seguradoras.includes(nome);
     });
 }
-function templateText(d: DemoDB, id: string) {
-  const t = d.templates.find((x) => x.id === id);
+function templateText(d: DemoDB, src: { templateId?: string; conteudo?: string }) {
+  if (src.conteudo !== undefined) {
+    if (!src.conteudo.trim()) throw new DemoHttpError(400, "Escreva a mensagem do disparo.");
+    return src.conteudo;
+  }
+  const t = d.templates.find((x) => x.id === src.templateId);
   if (!t) throw new DemoHttpError(404, "Template não encontrado.");
   if (t.anexarBoleto) throw new DemoHttpError(400, "Templates com boleto anexo só podem ser usados pelas réguas");
   return t.texto;
 }
 route("POST", "/messaging/broadcast/preview", ({ d, body }): BroadcastPreview => {
-  const b = body as { filtro: BroadcastFilter; templateId: string };
-  const texto = templateText(d, b.templateId);
+  const b = body as { filtro: BroadcastFilter; templateId?: string; conteudo?: string };
+  const texto = templateText(d, b);
   const list = filterClients(d, b.filtro);
   const ok = list.filter((c) => !c.optOut);
   return {
@@ -460,8 +476,8 @@ route("POST", "/messaging/broadcast/preview", ({ d, body }): BroadcastPreview =>
   };
 });
 route("POST", "/messaging/broadcast", ({ d, body }) => {
-  const b = body as { filtro: BroadcastFilter; templateId: string };
-  const texto = templateText(d, b.templateId);
+  const b = body as { filtro: BroadcastFilter; templateId?: string; conteudo?: string };
+  const texto = templateText(d, b);
   const list = filterClients(d, b.filtro).filter((c) => !c.optOut);
   const t = Date.now();
   list.forEach((c, k) =>

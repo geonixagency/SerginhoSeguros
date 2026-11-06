@@ -31,7 +31,7 @@ import { Badge, Card, CardHeader, Checkbox, EmptyState, ErrorState, Field, Input
 import { Dialog, DialogContent, Tabs, TabsContent } from "@/components/ui/overlays";
 import { WhatsAppIcon } from "@/components/site/whatsapp-icon";
 import { api, IS_DEMO } from "@/lib/api";
-import { FORMA_PAGAMENTO_LABEL, RAMOS, RAMO_LABEL, type BroadcastFilter, type BroadcastPreview, type FormaPagamento, type MessageRule, type RuleTrigger } from "@/lib/types";
+import { FORMA_PAGAMENTO_LABEL, RAMOS, RAMO_LABEL, type BroadcastFilter, type BroadcastPreview, type BroadcastSource, type FormaPagamento, type MessageRule, type RuleTrigger } from "@/lib/types";
 import { cn, formatDateTime, formatPhone, formatRelative, renderTemplate } from "@/lib/utils";
 
 const VARS = ["nome", "seguradora", "apolice", "valor", "vencimento", "placa"] as const;
@@ -415,11 +415,34 @@ function BroadcastTab() {
   const [templateId, setTemplateId] = useState("");
   const tplId = templateId || usable[0]?.id || "";
   const tpl = usable.find((t) => t.id === tplId);
+  // "template" = usa um template salvo; "nova" = mensagem personalizada escrita aqui
+  const [modo, setModo] = useState<"template" | "nova">("template");
+  const [novoNome, setNovoNome] = useState("");
+  const [novoTexto, setNovoTexto] = useState("");
+  const [salvarTemplate, setSalvarTemplate] = useState(true);
+  const source: BroadcastSource | null =
+    modo === "template" ? (tplId ? { templateId: tplId } : null) : novoTexto.trim() ? { conteudo: novoTexto.trim() } : null;
   const [preview, setPreview] = useState<BroadcastPreview | null>(null);
-  const prev = useMutation({ mutationFn: () => api.messaging.broadcastPreview(filtro, tplId), onSuccess: setPreview, onError: (e: Error) => toast.error(e.message) });
+  const salvar = useMutation({
+    mutationFn: () => api.messaging.createTemplate({ nome: novoNome.trim(), texto: novoTexto.trim() }),
+    onSuccess: (t) => {
+      toast.success("Template salvo", { description: `"${t.nome}" agora aparece na lista de templates.` });
+      qc.invalidateQueries({ queryKey: ["messaging", "templates"] });
+      setTemplateId(t.id);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const prev = useMutation({ mutationFn: () => api.messaging.broadcastPreview(filtro, source!), onSuccess: setPreview, onError: (e: Error) => toast.error(e.message) });
   const send = useMutation({
     onError: (e: Error) => toast.error(e.message),
-    mutationFn: () => api.messaging.broadcast(filtro, tplId),
+    mutationFn: async () => {
+      // Mensagem nova com "salvar como template": salva (uma vez) e dispara pelo template salvo.
+      if (modo === "nova" && salvarTemplate) {
+        const t = salvar.data ?? (await salvar.mutateAsync());
+        return api.messaging.broadcast(filtro, { templateId: t.id });
+      }
+      return api.messaging.broadcast(filtro, source!);
+    },
     onSuccess: (r) => {
       toast.success(`${r.enfileiradas} mensagens na fila`, { description: "Envio espaçado de 20 a 60 s, das 8h às 20h." });
       setPreview(null);
@@ -463,32 +486,121 @@ function BroadcastTab() {
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Mensagem (template)" htmlFor="b-tpl">
-            <NativeSelect
-              id="b-tpl"
-              value={tplId}
-              disabled={!usable.length}
-              onChange={(e) => {
-                setTemplateId(e.target.value);
-                setPreview(null);
-              }}
-            >
-              {!usable.length && <option value="">{templates.isLoading ? "Carregando…" : "Nenhum template disponível"}</option>}
-              {usable.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nome}
-                </option>
+          <div className="grid grid-cols-1 gap-3 sm:col-span-2">
+            <div role="radiogroup" aria-label="Mensagem do disparo" className="grid grid-cols-2 gap-1 rounded-xl bg-sunken p-1">
+              {(
+                [
+                  ["template", "Usar template"],
+                  ["nova", "Criar mensagem"],
+                ] as const
+              ).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={modo === m}
+                  onClick={() => {
+                    setModo(m);
+                    setPreview(null);
+                  }}
+                  className={cn(
+                    "flex h-9 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors",
+                    modo === m ? "bg-surface text-foreground shadow-sm" : "text-muted hover:text-foreground",
+                  )}
+                >
+                  {m === "template" ? <ListOrdered className="size-4" /> : <Pencil className="size-4" />} {label}
+                </button>
               ))}
-            </NativeSelect>
-          </Field>
-          <div className="grid grid-cols-1 gap-1.5 sm:col-span-2">
-            <p className="text-xs font-semibold text-muted">Texto do template</p>
-            <p className="whitespace-pre-line rounded-[10px] border border-border bg-surface-2 p-3 text-sm leading-relaxed">{tpl?.texto ?? "Escolha um template."}</p>
-            <p className="text-xs text-subtle">Para mudar o texto, edite a régua correspondente na aba Réguas.</p>
+            </div>
+
+            {modo === "template" ? (
+              <>
+                <Field label="Template" htmlFor="b-tpl">
+                  <NativeSelect
+                    id="b-tpl"
+                    value={tplId}
+                    disabled={!usable.length}
+                    onChange={(e) => {
+                      setTemplateId(e.target.value);
+                      setPreview(null);
+                    }}
+                  >
+                    {!usable.length && <option value="">{templates.isLoading ? "Carregando…" : "Nenhum template disponível"}</option>}
+                    {usable.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <div className="grid grid-cols-1 gap-1.5">
+                  <p className="text-xs font-semibold text-muted">Texto do template</p>
+                  <p className="whitespace-pre-line rounded-[10px] border border-border bg-surface-2 p-3 text-sm leading-relaxed">{tpl?.texto ?? "Escolha um template."}</p>
+                  <p className="text-xs text-subtle">
+                    Quer outro texto?{" "}
+                    <button type="button" className="font-semibold text-accent-text hover:underline" onClick={() => setModo("nova")}>
+                      Crie uma mensagem personalizada
+                    </button>
+                    .
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                <Field label="Mensagem" htmlFor="b-novo-texto" hint="As variáveis são preenchidas com os dados de cada cliente (apólice vigente mais próxima do vencimento).">
+                  <TemplateEditor
+                    id="b-novo-texto"
+                    rows={5}
+                    value={novoTexto}
+                    onChange={(v) => {
+                      setNovoTexto(v);
+                      setPreview(null);
+                      salvar.reset();
+                    }}
+                  />
+                </Field>
+                <label className="flex items-center gap-2.5 text-sm font-medium">
+                  <Checkbox checked={salvarTemplate} onCheckedChange={(v) => setSalvarTemplate(v === true)} />
+                  Salvar como template reutilizável
+                </label>
+                {salvarTemplate && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <Field label="Nome do template" htmlFor="b-novo-nome">
+                      <Input
+                        id="b-novo-nome"
+                        value={novoNome}
+                        maxLength={80}
+                        placeholder="Ex.: Revisão de fim de ano"
+                        onChange={(e) => {
+                          setNovoNome(e.target.value);
+                          salvar.reset();
+                        }}
+                      />
+                    </Field>
+                    <Button
+                      variant="outline"
+                      onClick={() => salvar.mutate()}
+                      loading={salvar.isPending}
+                      disabled={novoNome.trim().length < 2 || !novoTexto.trim() || salvar.isSuccess}
+                    >
+                      {salvar.isSuccess ? "Salvo" : "Salvar template"}
+                    </Button>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-1.5">
+                  <p className="text-xs font-semibold text-muted">Pré-visualização (dados de exemplo)</p>
+                  {novoTexto.trim() ? (
+                    <Bubble texto={renderTemplate(novoTexto, SAMPLE)} />
+                  ) : (
+                    <p className="rounded-[10px] border border-dashed border-border p-3 text-sm text-subtle">Escreva a mensagem para ver como ela chega no WhatsApp.</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex justify-end border-t border-border px-5 py-4">
-          <Button variant="outline" onClick={() => prev.mutate()} loading={prev.isPending} disabled={!tplId}>
+          <Button variant="outline" onClick={() => prev.mutate()} loading={prev.isPending} disabled={!source || (modo === "nova" && salvarTemplate && novoNome.trim().length < 2)}>
             Ver prévia
           </Button>
         </div>

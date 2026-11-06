@@ -82,7 +82,7 @@ export function HeroShield({ className }: { className?: string }) {
           particles.map((p, i) => (
             <motion.span
               key={i}
-              className="absolute bottom-0 rounded-full bg-gold-300"
+              className="absolute bottom-0 rounded-full bg-gold-500 dark:bg-gold-300"
               style={{ left: `${p.x}%`, width: p.size, height: p.size, boxShadow: "0 0 8px rgba(251,226,134,0.8)" }}
               animate={{ y: [0, -460], x: [0, p.drift], opacity: [0, 0.9, 0] }}
               transition={{ duration: p.dur, delay: p.delay, repeat: Infinity, ease: "linear" }}
@@ -257,7 +257,7 @@ export function HeroShield({ className }: { className?: string }) {
                       "relative grid size-14 place-items-center rounded-2xl border backdrop-blur-md transition-all duration-500 sm:size-16",
                       on
                         ? "border-gold-300/80 bg-gold-gradient text-ink-950 shadow-[0_0_0_6px_rgba(238,189,37,0.14),0_18px_40px_-10px_rgba(238,189,37,0.65)]"
-                        : "border-white/12 bg-ink-900/70 text-gold-200 shadow-[0_14px_30px_-12px_rgba(0,0,0,0.8)]",
+                        : "border-ink-950/10 bg-white/85 text-gold-700 shadow-[0_14px_30px_-12px_rgba(70,50,12,0.3)] dark:border-white/12 dark:bg-ink-900/70 dark:text-gold-200 dark:shadow-[0_14px_30px_-12px_rgba(0,0,0,0.8)]",
                     )}
                   >
                     <Icon className="size-6 sm:size-7" strokeWidth={1.8} />
@@ -269,7 +269,7 @@ export function HeroShield({ className }: { className?: string }) {
                       />
                     )}
                   </span>
-                  <span className={cn("text-[11px] font-bold uppercase tracking-[0.18em] transition-colors", on ? "text-gold-200" : "text-ivory-100/50")}>{n.label}</span>
+                  <span className={cn("text-[11px] font-bold uppercase tracking-[0.18em] transition-colors", on ? "text-gold-700 dark:text-gold-200" : "text-ink-900/50 dark:text-ivory-100/50")}>{n.label}</span>
                 </motion.span>
               </motion.button>
             );
@@ -284,7 +284,7 @@ export function HeroShield({ className }: { className?: string }) {
           initial={play ? { opacity: 0, y: 8, filter: "blur(6px)" } : false}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.4 }}
-          className="inline-flex items-center gap-2 rounded-full border border-gold-500/30 bg-ink-900/80 px-4 py-1.5 text-[13px] font-semibold text-ivory-100 backdrop-blur"
+          className="inline-flex items-center gap-2 rounded-full border border-gold-500/30 bg-white/85 px-4 py-1.5 text-[13px] font-semibold text-ink-950 backdrop-blur dark:bg-ink-900/80 dark:text-ivory-100"
         >
           <span className="size-1.5 rounded-full bg-[#3ddc84] shadow-[0_0_8px_#3ddc84]" aria-hidden />
           {current.caption}

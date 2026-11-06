@@ -68,6 +68,8 @@ import type {
   MessageRule,
   MessageStatus,
   MessageTemplate,
+  CreateTemplateInput,
+  BroadcastSource,
   Paginated,
   ParseResult,
   ParsedField,
@@ -781,6 +783,10 @@ export const realApi = {
       const r = await http.patch<MessagingInstanceStatusDTO>("/messaging/instance", body);
       return instanceVm(r, r.settings, r.estado === "connecting" ? lastQr : null);
     },
+    createTemplate: async (data: CreateTemplateInput): Promise<MessageTemplate> => {
+      const t = await http.post<MessageTemplateDTO>("/messaging/templates", { nome: data.nome.trim(), conteudo: data.texto.trim() });
+      return { id: t.id, nome: t.nome, texto: t.conteudo, anexarBoleto: t.anexarBoleto };
+    },
     templates: async (): Promise<MessageTemplate[]> =>
       unwrap(await http.get<MessageTemplateDTO[] | { data: MessageTemplateDTO[] }>("/messaging/templates"))
         .filter((t) => t.ativo)
@@ -817,12 +823,11 @@ export const realApi = {
       const all = await realApi.messaging.rules();
       return all.find((x) => x.id === id)!;
     },
-    broadcastPreview: async (filtro: BroadcastFilter, templateId: string): Promise<BroadcastPreview> => {
-      const tpls = await realApi.messaging.templates();
-      const tpl = tpls.find((t) => t.id === templateId);
+    broadcastPreview: async (filtro: BroadcastFilter, source: BroadcastSource): Promise<BroadcastPreview> => {
+      const conteudo = "conteudo" in source ? source.conteudo : ((await realApi.messaging.templates()).find((t) => t.id === source.templateId)?.texto ?? "");
       const [r, prev] = await Promise.all([
-        http.post<BroadcastResponse>("/messaging/broadcast", { templateId, filtro: broadcastFilter(filtro), dryRun: true }),
-        http.post<{ texto: string }>("/messaging/templates/preview", { conteudo: tpl?.texto ?? "" }),
+        http.post<BroadcastResponse>("/messaging/broadcast", { ...source, filtro: broadcastFilter(filtro), dryRun: true }),
+        http.post<{ texto: string }>("/messaging/templates/preview", { conteudo }),
       ]);
       return {
         total: r.total,
@@ -832,8 +837,8 @@ export const realApi = {
         amostra: [{ clientId: "exemplo", nome: "Cliente de exemplo", telefone: "", texto: prev.texto }],
       };
     },
-    broadcast: async (filtro: BroadcastFilter, templateId: string) => {
-      const r = await http.post<BroadcastResponse>("/messaging/broadcast", { templateId, filtro: broadcastFilter(filtro), dryRun: false });
+    broadcast: async (filtro: BroadcastFilter, source: BroadcastSource) => {
+      const r = await http.post<BroadcastResponse>("/messaging/broadcast", { ...source, filtro: broadcastFilter(filtro), dryRun: false });
       return { enfileiradas: r.total };
     },
     history: async (): Promise<Message[]> => (await http.get<ApiPage<MessageDTO>>("/messaging/history?pageSize=100")).data.map(message),

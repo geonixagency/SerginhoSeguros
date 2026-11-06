@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
@@ -112,27 +113,24 @@ const DIFERENCIAIS = [
 function SiteHeader() {
   const [open, setOpen] = useState(false);
   return (
-    <header className="absolute inset-x-0 top-0 z-30 text-ivory-100">
+    <header className="absolute inset-x-0 top-0 z-30 text-ink-950 dark:text-ivory-100">
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-3" aria-label="Serginho Seguros — início">
           <AnimatedLogo uid="hdr" animate={false} className="size-10" />
           <span className="leading-none">
             <span className="block font-display text-[19px] font-bold tracking-wide">Serginho Seguros</span>
-            <span className="block text-[10.5px] font-semibold uppercase tracking-[0.22em] text-gold-300/80">Consórcios e planos</span>
+            <span className="block text-[10.5px] font-semibold uppercase tracking-[0.22em] text-gold-700 dark:text-gold-300/80">Consórcios e planos</span>
           </span>
         </Link>
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Principal">
           {NAV.map((n) => (
-            <a key={n.href} href={n.href} className="rounded-lg px-3 py-2 text-sm font-medium text-ivory-100/80 transition-colors hover:text-gold-300">
+            <a key={n.href} href={n.href} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-900/75 transition-colors hover:text-gold-700 dark:text-ivory-100/80 dark:hover:text-gold-300">
               {n.label}
             </a>
           ))}
         </nav>
         <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <Link href="/login" className="hidden h-10 items-center rounded-[10px] border border-white/15 px-4 text-sm font-semibold transition-colors hover:border-gold-400 hover:text-gold-300 sm:inline-flex">
-            Área do corretor
-          </Link>
+          <ThemeToggle className="hover:bg-ink-950/5 dark:hover:bg-white/10" />
           <button className="grid size-10 place-items-center rounded-[10px] lg:hidden" onClick={() => setOpen((v) => !v)} aria-label={open ? "Fechar menu" : "Abrir menu"} aria-expanded={open}>
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
@@ -144,7 +142,7 @@ function SiteHeader() {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="mx-4 rounded-2xl border border-white/10 bg-ink-900/95 p-2 backdrop-blur lg:hidden"
+            className="mx-4 rounded-2xl border border-white/10 bg-ink-900/95 p-2 text-ivory-100 backdrop-blur lg:hidden"
             aria-label="Menu"
           >
             {NAV.map((n) => (
@@ -152,9 +150,6 @@ function SiteHeader() {
                 {n.label}
               </a>
             ))}
-            <Link href="/login" className="block rounded-xl px-4 py-3 text-base font-medium text-gold-300 hover:bg-white/5">
-              Área do corretor
-            </Link>
           </motion.nav>
         )}
       </AnimatePresence>
@@ -163,9 +158,13 @@ function SiteHeader() {
 }
 
 function Hero({ replay }: { replay: number }) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const light = mounted && resolvedTheme === "light";
   return (
     <section
-      className="group/hero relative isolate overflow-hidden bg-ink-950 text-ivory-100"
+      className="group/hero relative isolate overflow-hidden bg-ivory-100 text-ink-950 dark:bg-ink-950 dark:text-ivory-100"
       aria-labelledby="hero-title"
       onPointerMove={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
@@ -174,9 +173,13 @@ function Hero({ replay }: { replay: number }) {
       }}
     >
       <div className="absolute inset-0 -z-10 opacity-90">
-        <FoilDrift background="transparent" baseColor="#1c1c22" accentColor="#d8a218" highlight="#fff1c9" density={7000} />
+        {light ? (
+          <FoilDrift key="light" background="transparent" baseColor="#efe6d2" accentColor="#c9930f" highlight="#ffffff" density={7000} />
+        ) : (
+          <FoilDrift key="dark" background="transparent" baseColor="#1c1c22" accentColor="#d8a218" highlight="#fff1c9" density={7000} />
+        )}
       </div>
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_75%_40%,transparent,rgba(9,9,10,0.55)_60%,#09090a)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_75%_40%,transparent,rgba(247,243,234,0.6)_60%,#f7f3ea)] dark:bg-[radial-gradient(70%_60%_at_75%_40%,transparent,rgba(9,9,10,0.55)_60%,#09090a)]" />
       <div className="grain absolute inset-0 -z-10 opacity-[0.05] mix-blend-overlay" />
       {/* holofote que segue o mouse */}
       <div
@@ -191,27 +194,27 @@ function Hero({ replay }: { replay: number }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-gold-500/30 bg-gold-400/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-gold-300"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-gold-500/40 bg-gold-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-gold-800 dark:border-gold-500/30 dark:bg-gold-400/5 dark:text-gold-300"
           >
             <span className="size-1.5 rounded-full bg-gold-400" /> Corretora de seguros · há mais de 5 anos
           </motion.p>
           <FocusReveal
             as="h1"
             text="Seguro bom é aquele que tem gente por trás."
-            className="max-w-[16ch] font-display text-[44px] font-semibold leading-[0.98] tracking-[-0.02em] text-ivory-50 sm:text-6xl lg:text-[76px]"
+            className="max-w-[16ch] font-display text-[44px] font-semibold leading-[0.98] tracking-[-0.02em] text-ink-950 sm:text-6xl lg:text-[76px] dark:text-ivory-50"
             blur={14}
             transition={{ duration: 0.45, delay: 0.35, staggerChildren: 0.018, ease: "easeOut" }}
           />
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.6 }} className="mt-7 text-lg text-ivory-100/80 sm:text-xl">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.6 }} className="mt-7 text-lg text-ink-900/80 sm:text-xl dark:text-ivory-100/80">
             <TextCarousel
               prefix="Cuidamos do seu"
               texts={["carro", "futuro", "negócio", "lar", "imóvel", "consórcio"]}
               className="font-medium"
-              prefixClassName="text-ivory-100/75"
+              prefixClassName="text-ink-900/75 dark:text-ivory-100/75"
               badgeClassName="rounded-lg bg-gold-gradient py-0.5 font-display text-[1.35em] font-bold italic text-ink-950"
             />
           </motion.div>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.35, duration: 0.6 }} className="mt-6 max-w-xl text-[15px] leading-relaxed text-ivory-100/65">
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.35, duration: 0.6 }} className="mt-6 max-w-xl text-[15px] leading-relaxed text-ink-900/70 dark:text-ivory-100/65">
             Sergio e Viviani Rosalim comparam as melhores seguradoras para você e continuam por perto depois da assinatura — na renovação, na parcela e, principalmente, no sinistro.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.5, duration: 0.6 }} className="mt-9 flex flex-wrap gap-3">
@@ -222,7 +225,7 @@ function Hero({ replay }: { replay: number }) {
                 </a>
               </Button>
             </Magnetic>
-            <Button size="lg" asChild className="border border-white/15 bg-white/5 text-ivory-50 shadow-none hover:bg-white/10">
+            <Button size="lg" asChild className="border border-ink-950/15 bg-white/60 text-ink-950 shadow-none hover:bg-white dark:border-white/15 dark:bg-white/5 dark:text-ivory-50 dark:hover:bg-white/10">
               <a href={whatsappLink(WHATS, WHATS_MSG)} target="_blank" rel="noopener noreferrer">
                 <WhatsAppIcon className="size-[18px] text-[#25d366]" /> Falar no WhatsApp
               </a>
@@ -237,8 +240,8 @@ function Hero({ replay }: { replay: number }) {
       </div>
 
       {/* faixa de números */}
-      <div className="relative border-t border-white/10 bg-ink-950/70 backdrop-blur-sm">
-        <dl className="mx-auto grid max-w-6xl grid-cols-2 divide-white/10 px-4 sm:px-6 md:grid-cols-4 md:divide-x">
+      <div className="relative border-t border-ink-950/10 bg-ivory-50/70 backdrop-blur-sm dark:border-white/10 dark:bg-ink-950/70">
+        <dl className="mx-auto grid max-w-6xl grid-cols-2 divide-ink-950/10 px-4 dark:divide-white/10 sm:px-6 md:grid-cols-4 md:divide-x">
           {[
             { v: 5, pre: "+", suf: " anos", l: "de corretagem" },
             { v: 100, pre: "+", suf: "", l: "clientes satisfeitos" },
@@ -253,7 +256,7 @@ function Hero({ replay }: { replay: number }) {
                   <CountUp value={s.v} delay={0.15 * i} duration={1.6} />
                   <span className="text-3xl sm:text-4xl">{s.suf}</span>
                 </span>
-                <span className="mt-1 block text-[13px] font-medium uppercase tracking-[0.14em] text-ivory-100/55">{s.l}</span>
+                <span className="mt-1 block text-[13px] font-medium uppercase tracking-[0.14em] text-ink-900/60 dark:text-ivory-100/55">{s.l}</span>
               </dd>
             </div>
           ))}
@@ -590,9 +593,6 @@ function Footer() {
               {n.label}
             </a>
           ))}
-          <Link href="/login" className="hover:text-gold-300">
-            Área do corretor
-          </Link>
         </nav>
       </div>
       <div className="border-t border-white/5">

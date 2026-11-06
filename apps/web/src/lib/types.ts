@@ -331,6 +331,12 @@ export interface MessageTemplate {
   /** Templates com boleto anexo só servem às réguas (não ao disparo em massa). */
   anexarBoleto?: boolean;
 }
+export interface CreateTemplateInput {
+  nome: string;
+  texto: string;
+}
+/** Origem do texto do disparo em massa: um template salvo ou uma mensagem escrita na hora. */
+export type BroadcastSource = { templateId: string } | { conteudo: string };
 export type RuleTrigger = "PRIMEIRA_PARCELA" | "PROBLEMA_SEM_BOLETO" | "PROBLEMA_COM_BOLETO" | "ANIVERSARIO" | "RENOVACAO";
 export interface MessageRule {
   id: string;

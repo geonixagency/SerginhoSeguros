@@ -122,7 +122,7 @@ na Porto); a régua "problema no pagamento" (D+1) e as Ações por cliente passa
 | GET/POST | `/messaging/rules` | Lista ou cria réguas. `PATCH /messaging/rules/:id` edita uma régua. |
 | POST | `/messaging/rules/run` **[ADMIN]** | Roda o ciclo das réguas agora (ele já roda sozinho de hora em hora). |
 | GET | `/messaging/settings` | Configurações de envio. `PATCH /messaging/settings` **[ADMIN]** altera `pausado`, `limiteDiario`, `janelaInicio`, `janelaFim` e o intervalo. |
-| POST | `/messaging/broadcast` **[ADMIN]** | `{ templateId, filtro, dryRun }`. Com `dryRun: true` só conta os destinatários. |
+| POST | `/messaging/broadcast` **[ADMIN]** | `{ templateId \| conteudo, filtro, dryRun }`: informe um template salvo **ou** uma mensagem personalizada (`conteudo`, até 4000 caracteres), nunca os dois. As variáveis são preenchidas por cliente com a apólice vigente mais próxima do vencimento (seguradora, número, placa e próxima parcela em aberto). Com `dryRun: true` só conta os destinatários. |
 | GET | `/messaging/history?status=&clientId=&ruleId=&de=&ate=` | `Paginated<MessageDTO>` |
 | GET | `/messaging/queue` | Contadores da fila e das mensagens agendadas. |
 | POST | `/messaging/messages/:id/cancel` | Cancela uma mensagem agendada. |

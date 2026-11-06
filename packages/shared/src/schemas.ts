@@ -250,12 +250,17 @@ export const BroadcastFilterSchema = z.object({
   formasPagamento: z.array(FormaPagamentoSchema).optional(),
   clientIds: z.array(z.string()).max(5000).optional(),
 });
-export const BroadcastSchema = z.object({
-  templateId: z.string().min(1),
-  filtro: BroadcastFilterSchema.default({}),
-  /** true = só conta destinatários, não enfileira nada. */
-  dryRun: z.boolean().default(false),
-});
+export const BroadcastSchema = z
+  .object({
+    /** Template salvo (ativo, sem boleto)... */
+    templateId: z.string().min(1).optional(),
+    /** ...ou uma mensagem personalizada escrita na hora (aceita as mesmas {{variaveis}}). */
+    conteudo: z.string().trim().min(1).max(4000).optional(),
+    filtro: BroadcastFilterSchema.default({}),
+    /** true = só conta destinatários, não enfileira nada. */
+    dryRun: z.boolean().default(false),
+  })
+  .refine((v) => Boolean(v.templateId) !== Boolean(v.conteudo), { message: "Informe um template ou uma mensagem personalizada", path: ["templateId"] });
 export type BroadcastInput = z.infer<typeof BroadcastSchema>;
 
 export const MessageHistoryQuerySchema = PaginationQuerySchema.extend({
