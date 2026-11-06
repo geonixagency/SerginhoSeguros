@@ -144,6 +144,9 @@ route("POST", "/import/pdfs", ({ body }) => {
   const n = files.reduce((acc, f) => acc + (typeof f !== "string" && /\.zip$/i.test(f.name) ? 60 : 1), 0);
   return { recebidos: n, gravados: n, iguais: 0, substituidos: 0, semDestino: 0, invalidos: 0 };
 });
+route("POST", "/import/limpar", () => {
+  throw new DemoHttpError(403, "Na demonstração não é possível limpar a carteira");
+});
 route("POST", "/import/carteira", ({ body }) => {
   const dryRun = body instanceof FormData && body.get("dryRun") === "true";
   const id = `demo-${Date.now()}`;

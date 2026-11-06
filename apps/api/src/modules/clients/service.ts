@@ -43,11 +43,15 @@ export function clientData(input: Partial<ClientCreateInput>) {
 }
 
 /**
- * Cria o cliente ou, se o CPF/CNPJ já existe, completa só os campos vazios
- * (não sobrescreve o que o operador já corrigiu manualmente).
+ * Cria o cliente ou, se já existe cliente com o CPF/CNPJ, completa só os campos vazios
+ * (não sobrescreve o que o operador já corrigiu manualmente). O CPF pode repetir entre
+ * clientes (ex.: esposa com apólice no CPF do marido): havendo mais de um, escolhe o de
+ * mesmo nome; sem nome igual, cria um cliente novo.
  */
 export async function upsertClientByCpf(tx: Tx, input: ClientCreateInput): Promise<{ id: string; criado: boolean }> {
-  const existing = await tx.client.findUnique({ where: { cpfCnpj: input.cpfCnpj } });
+  const mesmos = await tx.client.findMany({ where: { cpfCnpj: input.cpfCnpj }, orderBy: { createdAt: "asc" } });
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+  const existing = mesmos.length === 1 ? mesmos[0]! : (mesmos.find((m) => norm(m.nome) === norm(input.nome)) ?? null);
   if (!existing) {
     const c = await tx.client.create({ data: { ...clientData(input), nome: input.nome, cpfCnpj: input.cpfCnpj } });
     return { id: c.id, criado: true };

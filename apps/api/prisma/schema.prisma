@@ -157,7 +157,9 @@ model Client {
   id          String       @id @default(cuid())
   nome        String
   /// Só dígitos (11 = CPF, 14 = CNPJ).
-  cpfCnpj     String       @unique @map("cpf_cnpj")
+  cpfCnpj     String       @map("cpf_cnpj")
+  /// Pasta de origem na base do corretor: identifica o cliente na importação (o CPF pode repetir, ex.: esposa com apólice no CPF do marido).
+  pasta       String?      @unique
   nascimento  DateTime?    @db.Date
   cnh         String?
   /// Só dígitos, DDD + número.
@@ -178,6 +180,7 @@ model Client {
   leads       Lead[]
   tasks       Task[]
 
+  @@index([cpfCnpj])
   @@index([nome])
   @@index([telefone])
   @@map("clients")

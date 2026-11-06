@@ -12,6 +12,7 @@ describe("caminhos dos PDFs", () => {
   it("relFromExtractorPath tira tudo até base/seguradora (Windows ou Linux)", () => {
     expect(relFromExtractorPath({ arquivo: "C:/Users/x/SS/base/seguradora\\Cliente A\\Apolices Vencidas\\a.pdf", cliente_pasta: "Cliente A" })).toBe("Cliente A/Apolices Vencidas/a.pdf");
     expect(relFromExtractorPath({ arquivo: "/data/seguradora/Cliente B/b.pdf", cliente_pasta: "Cliente B" })).toBe("Cliente B/b.pdf");
+    expect(relFromExtractorPath({ arquivo: "../baseAtualizada/Cliente D/Apolices Vencidas/d.pdf", cliente_pasta: "Cliente D" })).toBe("Cliente D/Apolices Vencidas/d.pdf");
     expect(relFromExtractorPath({ arquivo: "D:\\outro\\lugar\\c.pdf", cliente_pasta: "Cliente C" })).toBe("Cliente C/c.pdf");
     expect(relFromExtractorPath({ arquivo: "/x/seguradora/../../etc/passwd", cliente_pasta: "Z" })).toBe("etc/passwd");
   });
@@ -46,7 +47,7 @@ describe.skipIf(!enabled)("importação da carteira (integração)", async () =>
   let slug = "";
 
   const limpar = async () => {
-    const c = await prisma.client.findUnique({ where: { cpfCnpj: CPF }, select: { id: true } });
+    const c = await prisma.client.findFirst({ where: { cpfCnpj: CPF }, select: { id: true } });
     if (c) {
       await prisma.policy.deleteMany({ where: { clientId: c.id } });
       await prisma.document.deleteMany({ where: { clientId: c.id } });
@@ -116,7 +117,7 @@ describe.skipIf(!enabled)("importação da carteira (integração)", async () =>
   it("importCarteira cria cliente, apólice, parcela, item e documentos; reimportar não duplica", async () => {
     const r1 = await importCarteira(dados(), { resolveFile: await storageResolver() });
     expect(r1.stats).toMatchObject({ clientesCriados: 1, apolicesCriadas: 1, documentosCriados: 2, parcelas: 1, itens: 1, arquivosInexistentes: 0 });
-    const c = await prisma.client.findUniqueOrThrow({ where: { cpfCnpj: CPF }, include: { policies: { include: { documents: true } } } });
+    const c = await prisma.client.findFirstOrThrow({ where: { cpfCnpj: CPF }, include: { policies: { include: { documents: true } } } });
     expect(c.status).toBe("ATIVO");
     expect(c.telefone).toBe("16999990001");
     expect(c.policies).toHaveLength(1);

@@ -4,14 +4,15 @@
  * Importar carteira (só ADMIN).
  * 1) PDFs: .zip com a pasta base/seguradora (ou PDFs soltos), um arquivo por requisição.
  * 2) clients.json + policies.json do extrator: roda em segundo plano no servidor, com progresso.
- * Reimportar é seguro: clientes casam pelo CPF, apólices por seguradora + número, PDFs pelo caminho/hash.
+ * Reimportar é seguro: clientes casam pela pasta (nome da pasta = cliente; o CPF pode repetir), apólices por seguradora + número, PDFs pelo caminho/hash.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Database, FileArchive, FileJson, FlaskConical, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, FileArchive, FileJson, FlaskConical, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge, Card, CardHeader, Checkbox, Progress } from "@/components/ui/primitives";
+import { Badge, Card, CardHeader, Checkbox, Field, Input, Progress } from "@/components/ui/primitives";
+import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api } from "@/lib/api";
 import type { ImportJob, ImportStats, PdfBatchStats } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ export function ImportCarteira() {
         <PdfUpload onDone={() => qc.invalidateQueries({ queryKey: ["import-estado"] })} />
         <JsonImport onDone={() => qc.invalidateQueries()} />
       </div>
+      <LimparCarteira emAndamento={Boolean(estado.data?.importacaoEmAndamento)} onDone={() => qc.invalidateQueries()} />
     </div>
   );
 }
@@ -331,5 +333,60 @@ function Resumo({ itens }: { itens: [string, number, boolean?][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/* ---------------- Limpar carteira ---------------- */
+const FRASE = "LIMPAR CARTEIRA";
+
+function LimparCarteira({ emAndamento, onDone }: { emAndamento: boolean; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [texto, setTexto] = useState("");
+  const limpar = useMutation({
+    mutationFn: () => api.importacao.limpar(texto.trim()),
+    onSuccess: (r) => {
+      toast.success("Carteira limpa", { description: `${nf.format(r.clientes)} clientes e ${nf.format(r.apolices)} apólices removidos. Agora reimporte os PDFs e os JSON.` });
+      setOpen(false);
+      setTexto("");
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Card className="border-danger/30">
+      <CardHeader
+        icon={<Trash2 />}
+        title="Limpar carteira"
+        description="Apaga todos os clientes, apólices, parcelas, itens e documentos, e os PDFs importados. Use antes de reimportar uma base nova do zero. Não dá para desfazer."
+        action={
+          <Button variant="danger" size="sm" disabled={emAndamento} onClick={() => setOpen(true)}>
+            <Trash2 /> Limpar
+          </Button>
+        }
+      />
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setTexto(""); }}>
+        <DialogContent title="Limpar toda a carteira?" description="Todos os clientes e seus dados saem do sistema agora. O histórico de mensagens e os leads ficam, sem o vínculo com o cliente.">
+          <form
+            className="grid gap-4 p-5 pt-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (texto.trim() === FRASE) limpar.mutate();
+            }}
+          >
+            <Field label={`Digite ${FRASE} para confirmar`} htmlFor="limpar-confirmacao">
+              <Input id="limpar-confirmacao" value={texto} autoComplete="off" onChange={(e) => setTexto(e.target.value.toUpperCase())} />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="danger" loading={limpar.isPending} disabled={texto.trim() !== FRASE}>
+                Apagar tudo
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

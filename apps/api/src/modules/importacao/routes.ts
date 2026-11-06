@@ -3,13 +3,19 @@
 //   POST /import/carteira          multipart: clients (clients.json), policies (policies.json), dryRun
 //   GET  /import/carteira/:jobId   progresso da importação (roda em segundo plano)
 //   GET  /import/estado            contagens para a tela
+//   POST /import/limpar            apaga TODOS os clientes (com apólices, parcelas, itens e documentos)
+//                                  e os PDFs importados; exige { confirmacao: "LIMPAR CARTEIRA" }
 import { randomUUID } from "node:crypto";
+import { readdir, rm } from "node:fs/promises";
+import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../../lib/prisma";
 import { audit } from "../../lib/audit";
+import { resolveStoragePath } from "../../lib/storage";
+import { storageRoot } from "../../config/env";
 import { AppError, badRequest, notFound } from "../../lib/errors";
 import { CarteiraSchema, importCarteira, type ImportResult } from "./carteira";
-import { emptyBatchStats, loadFileIndex, saveFileIndex, storageResolver, storeLoosePdf, storeZip } from "./arquivos";
+import { clearFileIndex, emptyBatchStats, loadFileIndex, saveFileIndex, storageResolver, storeLoosePdf, storeZip } from "./arquivos";
 
 const MB = 1024 * 1024;
 /** Lote de PDFs: até ~60 MB por arquivo (zip) e 300 arquivos por requisição. */
@@ -32,6 +38,7 @@ type Job = {
 // Uma importação por vez (processo único da API). O estado fica em memória: basta para
 // acompanhar a barra de progresso; o resultado final também vai para a auditoria.
 const jobs = new Map<string, Job>();
+export const CONFIRMACAO_LIMPAR = "LIMPAR CARTEIRA";
 let running: string | null = null;
 
 export default async function importRoutes(app: FastifyInstance) {
@@ -138,6 +145,39 @@ export default async function importRoutes(app: FastifyInstance) {
     })();
 
     return reply.status(202).send({ jobId: job.id, total: job.total, dryRun });
+  });
+
+  app.post("/limpar", async (req) => {
+    const body = (req.body ?? {}) as { confirmacao?: unknown };
+    if (body.confirmacao !== CONFIRMACAO_LIMPAR) throw badRequest(`Para confirmar, envie o texto "${CONFIRMACAO_LIMPAR}"`);
+    if (running) throw new AppError(409, "IMPORT_RUNNING", "Há uma importação em andamento: aguarde terminar");
+    running = "limpeza";
+    try {
+      const antes = await Promise.all([prisma.client.count(), prisma.policy.count(), prisma.document.count({ where: { clientId: { not: null } } })]);
+      // Arquivos ligados a clientes fora das pastas da base (ex.: anexos manuais em _uploads).
+      const docs = await prisma.document.findMany({ where: { clientId: { not: null } }, select: { caminho: true } });
+      // Apólices, parcelas, itens, documentos, cotações e tarefas do cliente saem em cascata;
+      // mensagens e leads ficam no histórico, sem o vínculo.
+      const { count } = await prisma.client.deleteMany({});
+      let arquivos = 0;
+      // Pastas da base importada (tudo que não é pasta interna "_algo") + índice de nomes.
+      for (const e of await readdir(storageRoot, { withFileTypes: true }).catch(() => [])) {
+        if (e.name.startsWith("_")) continue;
+        await rm(path.join(storageRoot, e.name), { recursive: true, force: true });
+        arquivos++;
+      }
+      for (const d of docs) {
+        if (!d.caminho.startsWith("_uploads/")) continue;
+        if (await prisma.document.findFirst({ where: { caminho: d.caminho }, select: { id: true } })) continue;
+        await rm(resolveStoragePath(d.caminho), { force: true }).catch(() => undefined);
+      }
+      await clearFileIndex();
+      const resultado = { clientes: count, apolices: antes[1], documentos: antes[2], pastasRemovidas: arquivos };
+      await audit(req, "LIMPAR_CARTEIRA", "Carteira", null, { clientes: antes[0], apolices: antes[1], documentos: antes[2] }, resultado);
+      return resultado;
+    } finally {
+      running = null;
+    }
   });
 
   app.get("/carteira/:jobId", async (req) => {

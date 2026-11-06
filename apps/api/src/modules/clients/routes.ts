@@ -65,8 +65,6 @@ export default async function clientRoutes(app: FastifyInstance) {
 
   app.post("/", async (req, reply) => {
     const input = parse(ClientCreateSchema, req.body);
-    const exists = await prisma.client.findUnique({ where: { cpfCnpj: input.cpfCnpj }, select: { id: true } });
-    if (exists) throw conflict("Já existe cliente com este CPF/CNPJ");
     const c = await prisma.client.create({ data: { ...clientData(input), nome: input.nome, cpfCnpj: input.cpfCnpj, origem: input.origem ?? "MANUAL" } });
     await audit(req, "CRIAR", "Client", c.id, null, { nome: c.nome });
     return reply.status(201).send(await getClientDetail(c.id));
@@ -81,10 +79,6 @@ export default async function clientRoutes(app: FastifyInstance) {
     const { id } = parse(IdParams, req.params);
     const input = parse(ClientUpdateSchema, req.body);
     const before = await prisma.client.findUniqueOrThrow({ where: { id } });
-    if (input.cpfCnpj && input.cpfCnpj !== before.cpfCnpj) {
-      const dup = await prisma.client.findUnique({ where: { cpfCnpj: input.cpfCnpj }, select: { id: true } });
-      if (dup) throw conflict("Já existe cliente com este CPF/CNPJ");
-    }
     const data: Prisma.ClientUpdateInput = { ...clientData(input) };
     if (input.optOut !== undefined) {
       data.optOut = input.optOut;

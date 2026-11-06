@@ -3,7 +3,8 @@
 // Configurações > Importar carteira (PDFs enviados antes para STORAGE_DIR).
 //
 // Regras (iguais às do script original):
-// - Idempotente: cliente por CPF/CNPJ (upsert que só completa campos vazios), documento por
+// - Idempotente: cliente pela PASTA da base (nome da pasta = nome do cliente; o CPF/CNPJ pode
+//   repetir entre pastas, ex.: esposa com apólice no CPF do marido), upsert que só completa campos vazios, documento por
 //   caminho (ou mesmo hash no mesmo cliente), apólice por seguradora+número dentro do cliente.
 // - PDF sem arquivo disponível é pulado e contado; reimportar depois vincula os que chegaram.
 // - Parcelas vencidas entram como PAGO (carteira histórica), futuras como PENDENTE.
@@ -122,7 +123,7 @@ export function telefone(v: string | null | undefined): string | null {
  */
 export function relFromExtractorPath(p: Pick<ExtractedPolicy, "arquivo" | "cliente_pasta">): string {
   const norm = p.arquivo.replace(/\\/g, "/");
-  const m = /(?:^|\/)seguradora\/(.+)$/i.exec(norm);
+  const m = /(?:^|\/)(?:seguradora|baseAtualizada)\/(.+)$/i.exec(norm);
   const rel = m?.[1] ?? `${p.cliente_pasta}/${path.posix.basename(norm)}`;
   return rel
     .split("/")
@@ -182,7 +183,7 @@ export async function importCarteira(
     }
     const pdfs = [...(byPasta.get(c.cliente) ?? [])];
     if (dryRun) {
-      const existe = await prisma.client.findUnique({ where: { cpfCnpj: cpf }, select: { id: true } });
+      const existe = await prisma.client.findUnique({ where: { pasta: c.cliente }, select: { id: true } });
       if (existe) stats.clientesAtualizados++;
       else stats.clientesCriados++;
       stats.apolicesCriadas += pdfs.filter((p) => p.tipo_documento === "apolice" || p.tipo_documento === "proposta").length;
@@ -196,7 +197,8 @@ export async function importCarteira(
 
     const endereco = c.endereco || c.cidade || c.cep ? { logradouro: c.endereco, bairro: c.bairro, cidade: c.cidade, uf: c.uf, cep: c.cep } : null;
     const dados = {
-      nome: (c.nome_segurado ?? c.cliente).trim(),
+      // Critério das pastas: o nome do cliente é o nome da pasta.
+      nome: c.cliente.trim(),
       nascimento: isIso(c.data_nascimento) ? dateOnly(c.data_nascimento) : null,
       cnh: c.cnh ?? null,
       telefone: telefone(c.telefone),
@@ -205,9 +207,9 @@ export async function importCarteira(
     };
 
     // Cliente: cria ou completa só campos vazios (não sobrescreve correção manual).
-    let client = await prisma.client.findUnique({ where: { cpfCnpj: cpf } });
+    let client = await prisma.client.findUnique({ where: { pasta: c.cliente } });
     if (!client) {
-      client = await prisma.client.create({ data: { ...dados, endereco: dados.endereco ?? undefined, cpfCnpj: cpf, origem: "IMPORTACAO" } });
+      client = await prisma.client.create({ data: { ...dados, endereco: dados.endereco ?? undefined, cpfCnpj: cpf, pasta: c.cliente, origem: "IMPORTACAO" } });
       stats.clientesCriados++;
     } else {
       const patch: Prisma.ClientUpdateInput = {};

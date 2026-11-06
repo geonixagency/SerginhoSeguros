@@ -25,7 +25,7 @@ describe.skipIf(!enabled)("anexos e edição manual (integração)", async () =>
   let policyId = "";
 
   const limpar = async () => {
-    const c = await prisma.client.findUnique({ where: { cpfCnpj: CPF }, select: { id: true } });
+    const c = await prisma.client.findFirst({ where: { cpfCnpj: CPF }, select: { id: true } });
     if (c) {
       await prisma.policy.deleteMany({ where: { clientId: c.id } });
       await prisma.client.delete({ where: { id: c.id } });

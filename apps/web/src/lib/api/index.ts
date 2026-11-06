@@ -94,6 +94,9 @@ const demoApi = {
       return http.post<{ jobId: string; total: number; dryRun: boolean }>("/import/carteira", fd);
     },
     job: (id: string) => http.get<ImportJob>(`/import/carteira/${id}`),
+    /** Apaga todos os clientes e PDFs importados (ADMIN). */
+    limpar: (confirmacao: string) =>
+      http.post<{ clientes: number; apolices: number; documentos: number; pastasRemovidas: number }>("/import/limpar", { confirmacao }),
   },
   dashboard: {
     summary: () => http.get<DashboardSummary>("/dashboard/summary"),

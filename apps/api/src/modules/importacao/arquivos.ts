@@ -2,7 +2,7 @@
 // e resolução "PDF do extrator -> arquivo no armazenamento" usada pela importação dos JSON.
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { unzipSync } from "fflate";
 import { prisma } from "../../lib/prisma";
@@ -177,6 +177,10 @@ export async function storeLoosePdf(filename: string, buf: Buffer, s: PdfBatchSt
     return;
   }
   return storePdf(hits[0]!, buf, s);
+}
+
+export async function clearFileIndex(): Promise<void> {
+  await rm(resolveStoragePath(INDEX_REL), { force: true });
 }
 
 export { loadFileIndex };

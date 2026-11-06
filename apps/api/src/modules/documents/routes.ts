@@ -64,7 +64,7 @@ export default async function documentRoutes(app: FastifyInstance) {
     const slug = resolveInsurerSlug(out.seguradora.valor);
     const insurer = slug ? await prisma.insurer.findUnique({ where: { slug }, select: { id: true, nome: true } }) : null;
     const cpf = out.cliente.cpfCnpj.valor ? onlyDigits(out.cliente.cpfCnpj.valor) : null;
-    const existente = cpf ? await prisma.client.findUnique({ where: { cpfCnpj: cpf }, select: { id: true, nome: true } }) : null;
+    const existente = cpf ? await prisma.client.findFirst({ where: { cpfCnpj: cpf }, select: { id: true, nome: true } }) : null;
     const docExistente = await prisma.document.findFirst({ where: { hash }, select: { id: true } });
     const forma = FormaPagamentoSchema.safeParse(out.apolice.formaPagamento.valor?.toUpperCase());
 
