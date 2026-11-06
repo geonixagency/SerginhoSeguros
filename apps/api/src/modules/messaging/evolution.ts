@@ -89,9 +89,13 @@ export class EvolutionClient implements EvolutionApi {
   async connect() {
     await this.ensureInstance();
     await this.ensureWebhook();
-    const body = await this.http.json<{ base64?: string; code?: string; pairingCode?: string | null; instance?: { state?: string } }>({
-      path: `/instance/connect/${this.inst}`,
-    });
+    type ConnectBody = { base64?: string; code?: string; pairingCode?: string | null; instance?: { state?: string } };
+    let body = await this.http.json<ConnectBody>({ path: `/instance/connect/${this.inst}` });
+    // Instância recém-criada às vezes ainda não tem QR: tenta de novo algumas vezes antes de devolver vazio.
+    for (let i = 0; i < 3 && !body.base64 && body.instance?.state !== "open"; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      body = await this.http.json<ConnectBody>({ path: `/instance/connect/${this.inst}` });
+    }
     if (body.instance?.state === "open") return { state: "open" as const, qrcode: null, pairingCode: null };
     const qr = body.base64 ? (body.base64.startsWith("data:") ? body.base64 : `data:image/png;base64,${body.base64}`) : null;
     return { state: "connecting" as const, qrcode: qr, pairingCode: body.pairingCode ?? null };
