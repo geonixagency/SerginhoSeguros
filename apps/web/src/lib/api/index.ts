@@ -47,6 +47,10 @@ import type {
   TimelineEvent,
   User,
   WhatsappInstance,
+  BroadcastOptions,
+  BroadcastResult,
+  MessageAttachment,
+  MessagingPacing,
 } from "../types";
 
 export { IS_DEMO, ApiError, tokenStore } from "./client";
@@ -154,8 +158,17 @@ const demoApi = {
     createTemplate: (data: CreateTemplateInput) => http.post<MessageTemplate>("/messaging/templates", data),
     rules: () => http.get<MessageRule[]>("/messaging/rules"),
     updateRule: (id: string, data: Partial<MessageRule>) => http.patch<MessageRule>(`/messaging/rules/${id}`, data),
-    broadcastPreview: (filtro: BroadcastFilter, source: BroadcastSource) => http.post<BroadcastPreview>("/messaging/broadcast/preview", { filtro, ...source }),
-    broadcast: (filtro: BroadcastFilter, source: BroadcastSource) => http.post<{ enfileiradas: number }>("/messaging/broadcast", { filtro, ...source }),
+    broadcastPreview: (filtro: BroadcastFilter, source: BroadcastSource, opts: BroadcastOptions = {}) => http.post<BroadcastPreview>("/messaging/broadcast/preview", { filtro, ...source, ...opts }),
+    broadcast: (filtro: BroadcastFilter, source: BroadcastSource, opts: BroadcastOptions = {}) => http.post<BroadcastResult>("/messaging/broadcast", { filtro, ...source, ...opts }),
+    pacing: () => http.get<MessagingPacing>("/messaging/settings"),
+    updatePacing: (data: Partial<MessagingPacing>) => http.patch<MessagingPacing>("/messaging/settings", data),
+    /** Sobe um anexo (até 10 MB) para o envio avulso ou o disparo em massa. */
+    uploadAttachment: (file: File, clientId?: string) => {
+      const fd = new FormData();
+      if (clientId) fd.append("clientId", clientId);
+      fd.append("arquivo", file, file.name);
+      return http.post<MessageAttachment>("/messaging/attachments", fd);
+    },
     history: () => http.get<Message[]>("/messaging/history"),
     queue: () => http.get<Message[]>("/messaging/queue"),
     send: (clientId: string, texto: string, anexo?: string) => http.post<{ ok: boolean }>("/messaging/send", { clientId, texto, anexo }),

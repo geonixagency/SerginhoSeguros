@@ -265,7 +265,7 @@ function ActionsInner() {
           clientId={client.id}
           nome={client.nome}
           telefone={client.telefone}
-          anexo={result.documento?.nome}
+          anexo={result.documento ? { id: result.documento.id, nome: result.documento.nome } : undefined}
           textoInicial={
             result.acao === "BOLETO_2VIA"
               ? `Olá ${firstName(client.nome)}, tudo bem? Segue a 2ª via do boleto do seu seguro (${result.dados.find((d) => d.rotulo === "Parcela")?.valor ?? ""}), com vencimento em ${result.dados.find((d) => d.rotulo === "Vencimento")?.valor ?? ""}. Qualquer dúvida, estou à disposição!`

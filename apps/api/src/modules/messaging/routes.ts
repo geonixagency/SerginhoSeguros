@@ -12,7 +12,9 @@ import {
   RuleUpdateSchema,
   TemplateCreateSchema,
   TemplateUpdateSchema,
+  normalizePhoneBr,
   type BroadcastResponse,
+  type MessageAttachmentDTO,
   type MessagingConnectDTO,
   type MessageSendResponse,
   type MessagingInstanceDTO,
@@ -24,13 +26,16 @@ import { env } from "../../config/env";
 import { prisma } from "../../lib/prisma";
 import { parse } from "../../lib/validate";
 import { audit } from "../../lib/audit";
-import { badRequest, notFound } from "../../lib/errors";
+import { AppError, badRequest, notFound } from "../../lib/errors";
+import { saveUpload } from "../../lib/storage";
+import { estimateSchedule } from "./pacing";
+import { ANEXO_DIR, ANEXO_MAX_MB, sniffAttachment } from "./attachments";
 import { pageArgs, paginated } from "../../lib/pagination";
 import { messageDTO, ruleDTO, templateDTO } from "../../lib/serialize";
 import { getEvolution } from "./evolution";
 import { countSentToday, createAndEnqueue, getSettings } from "./service";
 import { getMessagesQueue } from "./queue";
-import { primeiroNome, renderTemplate, type TemplateVars } from "./template";
+import { primeiroNome, renderLoose, renderTemplate, type TemplateVars } from "./template";
 import { runRulesTick } from "./engine";
 import { formatBr, formatMoneyBr, toIsoDate } from "../../lib/dates";
 import { vigenteWhere } from "../policies/rules";
@@ -178,6 +183,46 @@ export default async function messagingRoutes(app: FastifyInstance) {
 
   app.patch("/settings", { onRequest: [app.requireRole("ADMIN")] }, async (req): Promise<MessagingSettingsDTO> => updateSettings(req));
 
+  // ------------------------------------------------------------ anexos
+  /**
+   * Sobe um arquivo para mandar no WhatsApp (até 10 MB: PDF, imagem, Word/Excel).
+   * Guardado uma vez em STORAGE_DIR/_anexos; o disparo em massa referencia o mesmo documento.
+   * Multipart: "arquivo" e, opcional, "clientId" (envio avulso: o anexo fica na ficha do cliente).
+   */
+  app.post("/attachments", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (req, reply): Promise<MessageAttachmentDTO> => {
+    if (!req.isMultipart()) throw badRequest("Envie o arquivo como multipart/form-data (campo 'arquivo')");
+    let file: { buf: Buffer; name: string } | null = null;
+    const fields: Record<string, string> = {};
+    for await (const part of req.parts({ limits: { fileSize: ANEXO_MAX_MB * 1024 * 1024, files: 1, fields: 3 } })) {
+      if (part.type === "file") {
+        const buf = await part.toBuffer();
+        if (part.file.truncated) throw new AppError(413, "FILE_TOO_LARGE", `O anexo passa de ${ANEXO_MAX_MB} MB`);
+        file = { buf, name: part.filename.replace(/^.*[\\/]/, "").replace(/[\x00-\x1f]/g, "").slice(0, 200) || "arquivo" };
+      } else if (typeof part.value === "string") fields[part.fieldname] = part.value;
+    }
+    if (!file) throw badRequest("Nenhum arquivo enviado (campo 'arquivo')");
+    const tipo = sniffAttachment(file.buf, file.name);
+    if (!tipo) throw badRequest("Formato não aceito. Envie PDF, imagem (JPG, PNG, WebP) ou documento do Word/Excel.");
+    const clientId = fields.clientId || null;
+    if (clientId && !(await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } }))) throw notFound("Cliente");
+    const saved = await saveUpload(file.buf, tipo.ext, ANEXO_DIR);
+    const doc = await prisma.document.create({
+      data: { clientId, tipo: "OUTRO", nomeArquivo: file.name, caminho: saved.caminho, hash: saved.hash, tamanho: saved.tamanho, mimeType: tipo.mime },
+    });
+    await audit(req, "ANEXO_MENSAGEM", "Document", doc.id, null, { nome: doc.nomeArquivo, tamanho: doc.tamanho, clientId });
+    return reply.status(201).send({ documentId: doc.id, nome: doc.nomeArquivo, mimeType: doc.mimeType, tamanho: doc.tamanho });
+  });
+
+  /** Anexo válido para a mensagem: documento do próprio cliente ou anexo avulso de mensagem. */
+  async function checkAnexo(id: string | null | undefined, clientId: string | null) {
+    if (!id) return null;
+    const doc = await prisma.document.findUnique({ where: { id }, select: { id: true, clientId: true, caminho: true, tamanho: true } });
+    const avulso = doc && doc.clientId === null && doc.caminho.startsWith(`${ANEXO_DIR}/`);
+    if (!doc || (!avulso && doc.clientId !== clientId)) throw badRequest("Anexo não pertence a este cliente");
+    if (doc.tamanho > ANEXO_MAX_MB * 1024 * 1024) throw badRequest(`O WhatsApp aceita anexos de até ${ANEXO_MAX_MB} MB`);
+    return doc.id;
+  }
+
   // ------------------------------------------------------------ envio avulso
   /** Mensagem avulsa para um cliente: passa pela mesma fila (janela 8h–20h, limite diário, opt-out). */
   app.post("/send", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (req, reply): Promise<MessageSendResponse> => {
@@ -186,10 +231,7 @@ export default async function messagingRoutes(app: FastifyInstance) {
     if (!client) throw notFound("Cliente");
     if (!client.telefone) throw badRequest("Cliente sem telefone cadastrado");
     if (client.optOut) throw badRequest("Cliente pediu para não receber mensagens (opt-out)");
-    if (input.anexoDocumentId) {
-      const doc = await prisma.document.findFirst({ where: { id: input.anexoDocumentId, clientId: client.id }, select: { id: true } });
-      if (!doc) throw badRequest("Anexo não pertence a este cliente");
-    }
+    await checkAnexo(input.anexoDocumentId, client.id);
     const agendadaPara = new Date();
     const messageId = await createAndEnqueue({
       clientId: client.id,
@@ -203,7 +245,7 @@ export default async function messagingRoutes(app: FastifyInstance) {
   });
 
   // ------------------------------------------------------------ disparo em massa
-  app.post("/broadcast", { onRequest: [app.requireRole("ADMIN")] }, async (req): Promise<BroadcastResponse> => {
+  app.post("/broadcast", { onRequest: [app.requireRole("ADMIN")], bodyLimit: 8 * 1024 * 1024 /* CSV com até 5.000 contatos */ }, async (req): Promise<BroadcastResponse> => {
     const input = parse(BroadcastSchema, req.body);
     let conteudoBase: string;
     let templateId: string | null = null;
@@ -216,6 +258,49 @@ export default async function messagingRoutes(app: FastifyInstance) {
     } else {
       conteudoBase = input.conteudo!;
     }
+    const anexoDocumentId = await checkAnexo(input.anexoDocumentId, null);
+    const settings = await getSettings();
+    const estimar = async (n: number) => estimateSchedule(n, settings, new Date(), await countSentToday());
+
+    // ---- origem: CSV de contatos
+    if (input.contatos) {
+      const seen = new Set<string>();
+      let invalidos = 0;
+      let duplicados = 0;
+      const lista: { telefone: string; nome: string; vars: Record<string, string> }[] = [];
+      for (const c of input.contatos) {
+        const tel = normalizePhoneBr(c.telefone);
+        if (!tel) invalidos++;
+        else if (seen.has(tel)) duplicados++;
+        else {
+          seen.add(tel);
+          lista.push({ ...c, telefone: tel });
+        }
+      }
+      // Opt-out: telefone de cliente que pediu para sair não recebe, mesmo vindo do CSV.
+      const clientes = await prisma.client.findMany({ where: { telefone: { in: [...seen] } }, select: { id: true, telefone: true, optOut: true } });
+      const porTel = new Map(clientes.map((c) => [c.telefone!, c]));
+      const alvo = lista.filter((c) => !porTel.get(c.telefone)?.optOut);
+      const ignorados = { semTelefone: 0, optOut: lista.length - alvo.length, invalidos, duplicados };
+      if (input.dryRun) return { broadcastId: null, total: alvo.length, ignorados, dryRun: true, estimativa: await estimar(alvo.length) };
+
+      const broadcastId = randomUUID();
+      for (const c of alvo) {
+        const vars = { ...c.vars, nome: primeiroNome(c.nome || c.vars.nome || ""), nome_completo: c.nome || c.vars.nome || "", telefone: c.telefone };
+        await createAndEnqueue({
+          clientId: porTel.get(c.telefone)?.id ?? null,
+          telefone: c.telefone,
+          conteudo: renderLoose(conteudoBase, vars),
+          templateId,
+          anexoDocumentId,
+          broadcastId,
+          dedupeKey: `broadcast-${broadcastId}-${c.telefone}`,
+        });
+      }
+      await audit(req, "DISPARO_EM_MASSA", "MessageTemplate", templateId ?? broadcastId, null, { broadcastId, total: alvo.length, origem: "csv", ignorados, anexo: Boolean(anexoDocumentId) });
+      return { broadcastId, total: alvo.length, ignorados, dryRun: false, estimativa: await estimar(alvo.length) };
+    }
+
     const f = input.filtro;
     const policyFilter: Prisma.PolicyWhereInput = {
       ...vigenteWhere(),
@@ -254,7 +339,7 @@ export default async function messagingRoutes(app: FastifyInstance) {
     const semTelefone = clients.filter((c) => !c.telefone).length;
     const optOut = clients.filter((c) => c.telefone && c.optOut).length;
     const alvo = clients.filter((c) => c.telefone && !c.optOut);
-    if (input.dryRun) return { broadcastId: null, total: alvo.length, ignorados: { semTelefone, optOut }, dryRun: true };
+    if (input.dryRun) return { broadcastId: null, total: alvo.length, ignorados: { semTelefone, optOut }, dryRun: true, estimativa: await estimar(alvo.length) };
 
     const broadcastId = randomUUID();
     for (const c of alvo) {
@@ -263,6 +348,7 @@ export default async function messagingRoutes(app: FastifyInstance) {
         telefone: c.telefone!,
         conteudo: renderTemplate(conteudoBase, broadcastVars(c)),
         templateId,
+        anexoDocumentId,
         broadcastId,
         dedupeKey: `broadcast-${broadcastId}-${c.id}`,
       });
@@ -271,9 +357,10 @@ export default async function messagingRoutes(app: FastifyInstance) {
       broadcastId,
       total: alvo.length,
       filtro: f,
+      anexo: Boolean(anexoDocumentId),
       ...(templateId ? {} : { personalizado: true }),
     });
-    return { broadcastId, total: alvo.length, ignorados: { semTelefone, optOut }, dryRun: false };
+    return { broadcastId, total: alvo.length, ignorados: { semTelefone, optOut }, dryRun: false, estimativa: await estimar(alvo.length) };
   });
 
   // ------------------------------------------------------------ histórico e fila

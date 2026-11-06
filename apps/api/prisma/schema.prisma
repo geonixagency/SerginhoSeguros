@@ -444,8 +444,11 @@ model MessagingSettings {
   limiteDiario    Int      @default(200) @map("limite_diario")
   janelaInicio    Int      @default(8) @map("janela_inicio")
   janelaFim       Int      @default(20) @map("janela_fim")
-  intervaloMinSeg Int      @default(20) @map("intervalo_min_seg")
-  intervaloMaxSeg Int      @default(60) @map("intervalo_max_seg")
+  intervaloMinSeg Int      @default(50) @map("intervalo_min_seg")
+  intervaloMaxSeg Int      @default(230) @map("intervalo_max_seg")
+  /// Envios automáticos por lote; depois do lote, pausa de `lotePausaMin` minutos.
+  loteTamanho     Int      @default(25) @map("lote_tamanho")
+  lotePausaMin    Int      @default(240) @map("lote_pausa_min")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("messaging_settings")

@@ -339,7 +339,25 @@ export interface MessagingSettingsDTO {
   janelaFim: number;
   intervaloMinSeg: number;
   intervaloMaxSeg: number;
+  loteTamanho: number;
+  lotePausaMin: number;
   enviadasHoje: number;
+}
+
+/** Previsão do disparo com o ritmo configurado. */
+export interface BroadcastEstimateDTO {
+  total: number;
+  lotes: number;
+  inicioPrevisto: string;
+  terminoPrevisto: string;
+}
+
+/** POST /messaging/attachments */
+export interface MessageAttachmentDTO {
+  documentId: string;
+  nome: string;
+  mimeType: string;
+  tamanho: number;
 }
 
 export interface MessagingQueueDTO {
@@ -350,8 +368,9 @@ export interface MessagingQueueDTO {
 export interface BroadcastResponse {
   broadcastId: string | null;
   total: number;
-  ignorados: { semTelefone: number; optOut: number };
+  ignorados: { semTelefone: number; optOut: number; invalidos?: number; duplicados?: number };
   dryRun: boolean;
+  estimativa?: BroadcastEstimateDTO;
 }
 
 // ---------------------------------------------------------------- CRM e cotações

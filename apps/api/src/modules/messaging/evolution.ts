@@ -14,7 +14,8 @@ export interface EvolutionApi {
   connect(): Promise<{ state: InstanceState; qrcode: string | null; pairingCode: string | null }>;
   logout(): Promise<void>;
   sendText(numero: string, texto: string): Promise<{ id: string | null }>;
-  sendDocument(numero: string, pdf: Buffer, fileName: string, legenda: string): Promise<{ id: string | null }>;
+  /** Envia arquivo (PDF, imagem ou documento). `mimetype` decide entre "image" e "document". */
+  sendDocument(numero: string, arquivo: Buffer, fileName: string, legenda: string, mimetype?: string): Promise<{ id: string | null }>;
 }
 
 /** Número no formato que a Evolution espera: 55 + DDD + número, só dígitos. */
@@ -115,15 +116,15 @@ export class EvolutionClient implements EvolutionApi {
     return { id: body.key?.id ?? null };
   }
 
-  async sendDocument(numero: string, pdf: Buffer, fileName: string, legenda: string) {
+  async sendDocument(numero: string, arquivo: Buffer, fileName: string, legenda: string, mimetype = "application/pdf") {
     const body = await this.http.json<{ key?: { id?: string } }>({
       method: "POST",
       path: `/message/sendMedia/${this.inst}`,
       body: {
         number: toWhatsappNumber(numero),
-        mediatype: "document",
-        mimetype: "application/pdf",
-        media: pdf.toString("base64"),
+        mediatype: mimetype.startsWith("image/") ? "image" : "document",
+        mimetype,
+        media: arquivo.toString("base64"),
         fileName,
         caption: legenda,
       },
@@ -137,7 +138,7 @@ export class MockEvolution implements EvolutionApi {
   readonly mock = true;
   readonly configured = true;
   state: InstanceState = "close";
-  sent: Array<{ numero: string; texto: string; anexo?: string }> = [];
+  sent: Array<{ numero: string; texto: string; anexo?: string; mimetype?: string }> = [];
 
   async connectionState() {
     return this.state;
@@ -155,8 +156,8 @@ export class MockEvolution implements EvolutionApi {
     this.sent.push({ numero: toWhatsappNumber(numero), texto });
     return { id: `mock-${this.sent.length}` };
   }
-  async sendDocument(numero: string, _pdf: Buffer, fileName: string, legenda: string) {
-    this.sent.push({ numero: toWhatsappNumber(numero), texto: legenda, anexo: fileName });
+  async sendDocument(numero: string, _arquivo: Buffer, fileName: string, legenda: string, mimetype = "application/pdf") {
+    this.sent.push({ numero: toWhatsappNumber(numero), texto: legenda, anexo: fileName, mimetype });
     return { id: `mock-${this.sent.length}` };
   }
 }

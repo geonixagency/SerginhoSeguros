@@ -282,6 +282,13 @@ export const BroadcastFilterSchema = z.object({
   formasPagamento: z.array(FormaPagamentoSchema).optional(),
   clientIds: z.array(z.string()).max(5000).optional(),
 });
+/** Contato vindo de CSV: telefone + variáveis livres ({{coluna}}). */
+export const BroadcastContactSchema = z.object({
+  // Telefone cru do CSV: o servidor normaliza e conta os inválidos (não rejeita o disparo).
+  telefone: z.string().max(40),
+  nome: z.string().max(200).optional().default(""),
+  vars: z.record(z.string().regex(/^[a-z0-9_]{1,40}$/), z.string().max(500)).default({}),
+});
 export const BroadcastSchema = z
   .object({
     /** Template salvo (ativo, sem boleto)... */
@@ -289,6 +296,10 @@ export const BroadcastSchema = z
     /** ...ou uma mensagem personalizada escrita na hora (aceita as mesmas {{variaveis}}). */
     conteudo: z.string().trim().min(1).max(4000).optional(),
     filtro: BroadcastFilterSchema.default({}),
+    /** Origem alternativa: contatos de um CSV (o filtro de clientes é ignorado). */
+    contatos: z.array(BroadcastContactSchema).min(1).max(5000).optional(),
+    /** Documento enviado junto para todos (POST /messaging/attachments). */
+    anexoDocumentId: z.string().min(1).optional().nullable(),
     /** true = só conta destinatários, não enfileira nada. */
     dryRun: z.boolean().default(false),
   })
@@ -308,8 +319,12 @@ export const MessagingSettingsUpdateSchema = z.object({
   limiteDiario: z.number().int().min(1).max(5000).optional(),
   janelaInicio: z.number().int().min(0).max(23).optional(),
   janelaFim: z.number().int().min(1).max(24).optional(),
-  intervaloMinSeg: z.number().int().min(5).max(600).optional(),
-  intervaloMaxSeg: z.number().int().min(5).max(900).optional(),
+  intervaloMinSeg: z.number().int().min(5).max(540).optional(),
+  // O worker segura o job durante o intervalo: o máximo cabe no lock da fila (10 min).
+  intervaloMaxSeg: z.number().int().min(5).max(540).optional(),
+  loteTamanho: z.number().int().min(1).max(500).optional(),
+  /** Pausa entre lotes, em minutos (0 = sem pausa). */
+  lotePausaMin: z.number().int().min(0).max(1440).optional(),
 });
 
 // ---------------------------------------------------------------- CRM

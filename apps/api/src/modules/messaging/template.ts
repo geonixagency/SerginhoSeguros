@@ -11,6 +11,17 @@ export function renderTemplate(conteudo: string, vars: TemplateVars): string {
     .trim();
 }
 
+/**
+ * Para contatos de CSV: aceita qualquer {{coluna}} (nomes já normalizados em minúsculas).
+ * Coluna inexistente ou vazia vira string vazia.
+ */
+export function renderLoose(conteudo: string, vars: Record<string, string | null | undefined>): string {
+  return conteudo
+    .replace(/\{\{\s*([\w]+)\s*\}\}/g, (_, k: string) => vars[k.toLowerCase()] ?? "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 /** Primeiro nome com inicial maiúscula ("MARIA DA SILVA" -> "Maria"). */
 export function primeiroNome(nome: string): string {
   const p = nome.trim().split(/\s+/)[0] ?? "";

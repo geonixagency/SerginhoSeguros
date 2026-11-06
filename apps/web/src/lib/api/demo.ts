@@ -25,6 +25,10 @@ import type {
   Lead,
   MessageRule,
   MessageTemplate,
+  BroadcastContact,
+  BroadcastResult,
+  MessageAttachment,
+  MessagingPacing,
   User,
   Paginated,
   ParseResult,
@@ -32,7 +36,7 @@ import type {
   Ramo,
 } from "../types";
 import { daysUntil, renderTemplate, formatBRL, formatDate } from "../utils";
-import { isValidCpfCnpj } from "@ss/shared";
+import { estimateSchedule, isValidCpfCnpj, normalizePhoneBr } from "@ss/shared";
 
 let db: DemoDB | null = null;
 const getDB = () => (db ??= buildDemoDB());
@@ -610,6 +614,56 @@ route("PATCH", "/messaging/rules/:id", ({ d, params, body }): MessageRule => {
   Object.assign(r, body as object);
   return r;
 });
+const ANEXO_MAX = 10 * 1024 * 1024;
+const ANEXO_TIPOS = /\.(pdf|jpe?g|png|webp|docx?|xlsx?|pptx)$/i;
+function pacingOf(d: DemoDB): MessagingPacing {
+  d.pacing ??= { intervaloMinSeg: 50, intervaloMaxSeg: 230, loteTamanho: 25, lotePausaMin: 240 };
+  return { ...d.pacing, janelaInicio: 8, janelaFim: 20, limiteDiario: d.instance.limiteDiario, enviadasHoje: d.instance.enviadasHoje };
+}
+const estimar = (d: DemoDB, n: number) => estimateSchedule(n, pacingOf(d), new Date(), d.instance.enviadasHoje);
+route("GET", "/messaging/settings", ({ d }) => pacingOf(d));
+route("PATCH", "/messaging/settings", ({ d, body }) => {
+  const p = { ...pacingOf(d), ...(body as Partial<MessagingPacing>) };
+  if (p.intervaloMinSeg < 5 || p.intervaloMaxSeg > 540) throw new DemoHttpError(400, "Intervalo entre 5 e 540 segundos.");
+  if (p.intervaloMinSeg > p.intervaloMaxSeg) throw new DemoHttpError(400, "Intervalo mínimo maior que o máximo");
+  if (p.loteTamanho < 1 || p.loteTamanho > 500) throw new DemoHttpError(400, "Lote entre 1 e 500 mensagens.");
+  if (p.lotePausaMin < 0 || p.lotePausaMin > 1440) throw new DemoHttpError(400, "Pausa entre 0 e 24 horas.");
+  d.pacing = { intervaloMinSeg: p.intervaloMinSeg, intervaloMaxSeg: p.intervaloMaxSeg, loteTamanho: p.loteTamanho, lotePausaMin: p.lotePausaMin };
+  return pacingOf(d);
+});
+route("POST", "/messaging/attachments", async ({ d, body }): Promise<MessageAttachment> => {
+  const f = body instanceof FormData ? body.get("arquivo") : null;
+  if (!f || typeof f === "string") throw new DemoHttpError(400, "Nenhum arquivo enviado");
+  if (f.size > ANEXO_MAX) throw new DemoHttpError(413, "O anexo passa de 10 MB");
+  if (!ANEXO_TIPOS.test(f.name)) throw new DemoHttpError(400, "Formato não aceito. Envie PDF, imagem (JPG, PNG, WebP) ou documento do Word/Excel.");
+  await wait(400);
+  const id = `anexo-${Date.now()}`;
+  d.anexos = { ...(d.anexos ?? {}), [id]: f.name };
+  return { documentId: id, nome: f.name, mimeType: f.type || "application/octet-stream", tamanho: f.size };
+});
+const anexoNome = (d: DemoDB, id?: string | null) => (id ? (d.anexos?.[id] ?? d.documents.find((x) => x.id === id)?.nome ?? null) : null);
+/** CSV: normaliza, descarta inválidos e repetidos e tira quem pediu para sair (pelo telefone do cliente). */
+function csvTargets(d: DemoDB, contatos: BroadcastContact[]) {
+  const seen = new Set<string>();
+  let invalidos = 0;
+  let duplicados = 0;
+  const lista: BroadcastContact[] = [];
+  for (const c of contatos) {
+    const tel = normalizePhoneBr(c.telefone);
+    if (!tel) invalidos++;
+    else if (seen.has(tel)) duplicados++;
+    else {
+      seen.add(tel);
+      lista.push({ ...c, telefone: tel });
+    }
+  }
+  const optOutTel = new Set(d.clients.filter((c) => c.optOut && c.telefone).map((c) => normalizePhoneBr(c.telefone)));
+  const alvo = lista.filter((c) => !optOutTel.has(c.telefone));
+  return { alvo, invalidos, duplicados, optOut: lista.length - alvo.length };
+}
+const csvVars = (c: BroadcastContact) => ({ ...c.vars, nome: (c.nome || c.vars.nome || "").split(" ")[0] ?? "", nome_completo: c.nome || c.vars.nome || "", telefone: c.telefone });
+const renderLoose = (texto: string, vars: Record<string, string>) => texto.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => vars[k.toLowerCase()] ?? "");
+
 function filterClients(d: DemoDB, f: BroadcastFilter) {
   return d.clients
     .map((c) => toListItem(d, c))
@@ -631,15 +685,36 @@ function templateText(d: DemoDB, src: { templateId?: string; conteudo?: string }
   if (t.anexarBoleto) throw new DemoHttpError(400, "Templates com boleto anexo só podem ser usados pelas réguas");
   return t.texto;
 }
+type BroadcastBody = { filtro: BroadcastFilter; templateId?: string; conteudo?: string; contatos?: BroadcastContact[]; anexoDocumentId?: string | null };
 route("POST", "/messaging/broadcast/preview", ({ d, body }): BroadcastPreview => {
-  const b = body as { filtro: BroadcastFilter; templateId?: string; conteudo?: string };
+  const b = body as BroadcastBody;
   const texto = templateText(d, b);
+  if (b.contatos?.length) {
+    const r = csvTargets(d, b.contatos);
+    const e = estimar(d, r.alvo.length);
+    return {
+      total: r.alvo.length,
+      optOut: r.optOut,
+      invalidos: r.invalidos,
+      duplicados: r.duplicados,
+      lotes: e.lotes,
+      inicioPrevisto: e.inicioPrevisto,
+      terminoPrevisto: e.terminoPrevisto,
+      // Como na API real: a tela monta a prévia do CSV com a primeira linha.
+      amostra: [],
+    };
+  }
   const list = filterClients(d, b.filtro);
   const ok = list.filter((c) => !c.optOut);
+  const e = estimar(d, ok.length);
   return {
     total: ok.length,
     optOut: list.length - ok.length,
-    estimativaMin: Math.ceil((ok.length * 40) / 60),
+    invalidos: 0,
+    duplicados: 0,
+    lotes: e.lotes,
+    inicioPrevisto: e.inicioPrevisto,
+    terminoPrevisto: e.terminoPrevisto,
     amostra: ok.slice(0, 3).map((c) => ({
       clientId: c.id,
       nome: c.nome,
@@ -648,11 +723,38 @@ route("POST", "/messaging/broadcast/preview", ({ d, body }): BroadcastPreview =>
     })),
   };
 });
-route("POST", "/messaging/broadcast", ({ d, body }) => {
-  const b = body as { filtro: BroadcastFilter; templateId?: string; conteudo?: string };
+route("POST", "/messaging/broadcast", ({ d, body }): BroadcastResult => {
+  const b = body as BroadcastBody;
   const texto = templateText(d, b);
-  const list = filterClients(d, b.filtro).filter((c) => !c.optOut);
+  const anexo = anexoNome(d, b.anexoDocumentId);
   const t = Date.now();
+  const p = pacingOf(d);
+  // Horário previsto de cada mensagem: intervalo médio + pausa a cada lote (a fila real ainda respeita a janela).
+  const media = ((p.intervaloMinSeg + p.intervaloMaxSeg) / 2) * 1000;
+  const quando = (k: number) => new Date(t + (k + 1) * media + Math.floor(k / Math.max(1, p.loteTamanho)) * p.lotePausaMin * 60_000).toISOString();
+  if (b.contatos?.length) {
+    const { alvo } = csvTargets(d, b.contatos);
+    alvo.forEach((c, k) => {
+      const cli = d.clients.find((x) => normalizePhoneBr(x.telefone) === c.telefone);
+      d.messages.unshift({
+        id: `msg-b-${t}-${k}`,
+        clientId: cli?.id ?? "",
+        clientNome: cli?.nome ?? (c.nome || "Contato do CSV"),
+        telefone: c.telefone,
+        regra: "Disparo em massa (CSV)",
+        texto: renderLoose(texto, csvVars(c)),
+        anexo,
+        status: "NA_FILA",
+        criadoEm: now(),
+        agendadoPara: quando(k),
+        enviadoEm: null,
+        erro: null,
+      });
+    });
+    const e = estimar(d, alvo.length);
+    return { enfileiradas: alvo.length, lotes: e.lotes, terminoPrevisto: e.terminoPrevisto };
+  }
+  const list = filterClients(d, b.filtro).filter((c) => !c.optOut);
   list.forEach((c, k) =>
     d.messages.unshift({
       id: `msg-b-${t}-${k}`,
@@ -661,15 +763,16 @@ route("POST", "/messaging/broadcast", ({ d, body }) => {
       telefone: c.telefone,
       regra: "Disparo em massa",
       texto: renderTemplate(texto, { nome: c.nome.split(" ")[0], seguradora: c.seguradoras[0] ?? "" }),
-      anexo: null,
+      anexo,
       status: "NA_FILA",
       criadoEm: now(),
-      agendadoPara: new Date(t + (k + 1) * 40000).toISOString(),
+      agendadoPara: quando(k),
       enviadoEm: null,
       erro: null,
     }),
   );
-  return { enfileiradas: list.length };
+  const e = estimar(d, list.length);
+  return { enfileiradas: list.length, lotes: e.lotes, terminoPrevisto: e.terminoPrevisto };
 });
 route("GET", "/messaging/history", ({ d }) => d.messages.filter((m) => !["NA_FILA", "ENVIANDO"].includes(m.status)));
 route("GET", "/messaging/queue", ({ d }) => d.messages.filter((m) => ["NA_FILA", "ENVIANDO"].includes(m.status)).sort((a, b) => (a.agendadoPara ?? "").localeCompare(b.agendadoPara ?? "")));
@@ -677,7 +780,7 @@ route("POST", "/messaging/send", async ({ d, body }) => {
   const b = body as { clientId: string; texto: string; anexo?: string };
   await wait(700);
   const c = d.clients.find((x) => x.id === b.clientId);
-  d.messages.unshift({ id: `msg-s-${Date.now()}`, clientId: b.clientId, clientNome: c?.nome ?? "", telefone: c?.telefone ?? "", regra: null, texto: b.texto, anexo: b.anexo ?? null, status: "ENVIADA", criadoEm: now(), agendadoPara: null, enviadoEm: now(), erro: null });
+  d.messages.unshift({ id: `msg-s-${Date.now()}`, clientId: b.clientId, clientNome: c?.nome ?? "", telefone: c?.telefone ?? "", regra: null, texto: b.texto, anexo: anexoNome(d, b.anexo) ?? b.anexo ?? null, status: "ENVIADA", criadoEm: now(), agendadoPara: null, enviadoEm: now(), erro: null });
   return { ok: true };
 });
 

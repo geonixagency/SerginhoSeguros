@@ -8,10 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { Textarea } from "@/components/ui/primitives";
 import { WhatsAppIcon } from "@/components/site/whatsapp-icon";
+import { AttachmentPicker } from "@/components/app/attachment-picker";
 import { api } from "@/lib/api";
+import type { MessageAttachment } from "@/lib/types";
 import { formatPhone } from "@/lib/utils";
 
-/** Pré-visualização estilo WhatsApp + envio pela instância da corretora (Evolution, via backend). */
+/**
+ * Pré-visualização estilo WhatsApp + envio pela instância da corretora (Evolution, via backend).
+ * `anexo` já vem anexado (ex.: 2ª via do boleto); dá para trocar ou anexar outro arquivo de até 10 MB.
+ */
 export function SendWhatsAppDialog({
   open,
   onOpenChange,
@@ -27,15 +32,20 @@ export function SendWhatsAppDialog({
   nome: string;
   telefone: string;
   textoInicial: string;
-  anexo?: string;
+  anexo?: { id: string; nome: string };
 }) {
   const [texto, setTexto] = useState(textoInicial);
+  const [arquivo, setArquivo] = useState<Pick<MessageAttachment, "documentId" | "nome"> | null>(null);
+  const anexoId = anexo?.id;
+  const anexoNome = anexo?.nome;
   useEffect(() => {
-    if (open) setTexto(textoInicial);
-  }, [open, textoInicial]);
+    if (!open) return;
+    setTexto(textoInicial);
+    setArquivo(anexoId && anexoNome ? { documentId: anexoId, nome: anexoNome } : null);
+  }, [open, textoInicial, anexoId, anexoNome]);
   const qc = useQueryClient();
   const send = useMutation({
-    mutationFn: () => api.messaging.send(clientId, texto, anexo),
+    mutationFn: () => api.messaging.send(clientId, texto, arquivo?.documentId),
     onSuccess: () => {
       toast.success("Mensagem enviada", { description: `Para ${nome} · ${formatPhone(telefone)}` });
       qc.invalidateQueries({ queryKey: ["client-messages", clientId] });
@@ -51,9 +61,9 @@ export function SendWhatsAppDialog({
         <div className="grid grid-cols-1 gap-4 p-6">
           <div className="rounded-2xl bg-[#e9e2d6] p-4 dark:bg-[#0b141a]" aria-label="Pré-visualização">
             <div className="ml-auto max-w-[85%] rounded-xl rounded-tr-sm bg-[#d9fdd3] px-3 py-2 text-[13.5px] leading-relaxed text-[#111b21] shadow-sm dark:bg-[#005c4b] dark:text-[#e9edef]">
-              {anexo && (
+              {arquivo && (
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-xs font-semibold dark:bg-white/10">
-                  <Paperclip className="size-3.5" /> {anexo}
+                  <Paperclip className="size-3.5 shrink-0" /> <span className="truncate">{arquivo.nome}</span>
                 </div>
               )}
               <p className="whitespace-pre-wrap">{texto || "…"}</p>
@@ -68,6 +78,7 @@ export function SendWhatsAppDialog({
             </label>
             <Textarea id="wa-text" rows={4} value={texto} onChange={(e) => setTexto(e.target.value)} />
           </div>
+          <AttachmentPicker value={arquivo} onChange={setArquivo} clientId={clientId} />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar

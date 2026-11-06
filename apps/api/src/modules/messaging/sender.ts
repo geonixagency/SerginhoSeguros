@@ -8,6 +8,9 @@ import { readFile } from "node:fs/promises";
 import { getEvolution } from "./evolution";
 import { countSentToday, getSettings } from "./service";
 import { enqueueMessage } from "./queue";
+import { batchResumeAt, randomIntervalMs } from "./pacing";
+
+export { randomIntervalMs };
 
 export type SendDecision =
   | { tipo: "enviar" }
@@ -34,12 +37,6 @@ export function decideSend(p: {
     return { tipo: "reagendar", para: amanha, motivo: "Limite diário atingido" };
   }
   return { tipo: "enviar" };
-}
-
-export function randomIntervalMs(min: number, max: number): number {
-  const lo = Math.min(min, max);
-  const hi = Math.max(min, max);
-  return (lo + Math.random() * (hi - lo)) * 1000;
 }
 
 export interface ProcessResult {
@@ -71,17 +68,39 @@ export async function processMessage(messageId: string, now = new Date()): Promi
     return { status: "REAGENDADA" };
   }
 
+  // Lotes: só para envios automáticos (réguas e disparo em massa). Mensagem avulsa não espera.
+  if (msg.ruleId || msg.broadcastId) {
+    const ultimas = await prisma.message.findMany({
+      where: { status: "ENVIADA", enviadaEm: { not: null }, OR: [{ ruleId: { not: null } }, { broadcastId: { not: null } }] },
+      orderBy: { enviadaEm: "desc" },
+      take: settings.loteTamanho,
+      select: { enviadaEm: true },
+    });
+    const retoma = batchResumeAt(
+      ultimas.map((m) => m.enviadaEm!),
+      settings.loteTamanho,
+      settings.lotePausaMin * 60_000,
+      now,
+    );
+    if (retoma) {
+      await prisma.message.update({ where: { id: msg.id }, data: { agendadaPara: retoma, erro: "Pausa entre lotes" } });
+      await enqueueMessage(msg.id, retoma);
+      return { status: "REAGENDADA" };
+    }
+  }
+
   await prisma.message.update({ where: { id: msg.id }, data: { status: "ENVIANDO", tentativas: { increment: 1 } } });
   try {
     const evo = getEvolution();
     let res: { id: string | null };
     if (msg.anexoDocument) {
-      const pdf = await readFile(resolveStoragePath(msg.anexoDocument.caminho));
-      res = await evo.sendDocument(msg.telefone, pdf, msg.anexoDocument.nomeArquivo, msg.conteudo);
+      const arquivo = await readFile(resolveStoragePath(msg.anexoDocument.caminho));
+      res = await evo.sendDocument(msg.telefone, arquivo, msg.anexoDocument.nomeArquivo, msg.conteudo, msg.anexoDocument.mimeType);
     } else {
       res = await evo.sendText(msg.telefone, msg.conteudo);
     }
     await prisma.message.update({ where: { id: msg.id }, data: { status: "ENVIADA", enviadaEm: new Date(), evolutionId: res.id, erro: null } });
+    // Avulsa também espaça (protege o número), mas sem lote.
     return { status: "ENVIADA", pausaMs: randomIntervalMs(settings.intervaloMinSeg, settings.intervaloMaxSeg) };
   } catch (err) {
     // Volta para AGENDADA para o retry da fila conseguir reprocessar.

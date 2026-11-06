@@ -437,6 +437,40 @@ export interface CreateTemplateInput {
 }
 /** Origem do texto do disparo em massa: um template salvo ou uma mensagem escrita na hora. */
 export type BroadcastSource = { templateId: string } | { conteudo: string };
+/** Ritmo dos envios automáticos (Disparos → Conexão). */
+export interface MessagingPacing {
+  intervaloMinSeg: number;
+  intervaloMaxSeg: number;
+  loteTamanho: number;
+  /** Minutos de pausa entre lotes. */
+  lotePausaMin: number;
+  janelaInicio: number;
+  janelaFim: number;
+  limiteDiario: number;
+  enviadasHoje: number;
+}
+/** Arquivo enviado junto da mensagem (até 10 MB). */
+export interface MessageAttachment {
+  documentId: string;
+  nome: string;
+  mimeType: string;
+  tamanho: number;
+}
+/** Contato vindo de CSV: as colunas viram variáveis {{coluna}}. */
+export interface BroadcastContact {
+  telefone: string;
+  nome: string;
+  vars: Record<string, string>;
+}
+export interface BroadcastOptions {
+  contatos?: BroadcastContact[];
+  anexoDocumentId?: string | null;
+}
+export interface BroadcastResult {
+  enfileiradas: number;
+  lotes: number;
+  terminoPrevisto: ISODate | null;
+}
 export type RuleTrigger = "PRIMEIRA_PARCELA" | "PROBLEMA_SEM_BOLETO" | "PROBLEMA_COM_BOLETO" | "ANIVERSARIO" | "RENOVACAO";
 export interface MessageRule {
   id: string;
@@ -476,8 +510,13 @@ export interface BroadcastFilter {
 export interface BroadcastPreview {
   total: number;
   optOut: number;
+  /** Só no CSV: telefones inválidos e repetidos descartados. */
+  invalidos: number;
+  duplicados: number;
   amostra: { clientId: string; nome: string; telefone: string; texto: string }[];
-  estimativaMin: number;
+  lotes: number;
+  inicioPrevisto: ISODate;
+  terminoPrevisto: ISODate;
 }
 
 export type LeadStage = "NOVO" | "EM_CONTATO" | "COTACAO_ENVIADA" | "NEGOCIACAO" | "FECHADO" | "PERDIDO";

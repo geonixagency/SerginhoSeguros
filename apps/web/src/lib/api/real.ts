@@ -95,6 +95,10 @@ import type {
   TimelineType,
   User,
   WhatsappInstance,
+  BroadcastOptions,
+  BroadcastResult,
+  MessageAttachment,
+  MessagingPacing,
 } from "../types";
 import type { ClientsQuery } from "./index";
 
@@ -594,6 +598,19 @@ const RAMO_FAMILY: Record<Ramo, string[]> = {
   CONSORCIO: ["consorcio"],
 };
 
+function pacingVm(s: MessagingSettingsDTO): MessagingPacing {
+  return {
+    intervaloMinSeg: s.intervaloMinSeg,
+    intervaloMaxSeg: s.intervaloMaxSeg,
+    loteTamanho: s.loteTamanho,
+    lotePausaMin: s.lotePausaMin,
+    janelaInicio: s.janelaInicio,
+    janelaFim: s.janelaFim,
+    limiteDiario: s.limiteDiario,
+    enviadasHoje: s.enviadasHoje,
+  };
+}
+
 /* ---------------------------------------------------------------- API */
 export const realApi = {
   auth: {
@@ -907,23 +924,42 @@ export const realApi = {
       const all = await realApi.messaging.rules();
       return all.find((x) => x.id === id)!;
     },
-    broadcastPreview: async (filtro: BroadcastFilter, source: BroadcastSource): Promise<BroadcastPreview> => {
+    broadcastPreview: async (filtro: BroadcastFilter, source: BroadcastSource, opts: BroadcastOptions = {}): Promise<BroadcastPreview> => {
       const conteudo = "conteudo" in source ? source.conteudo : ((await realApi.messaging.templates()).find((t) => t.id === source.templateId)?.texto ?? "");
+      const csv = opts.contatos?.length ? opts.contatos : null;
       const [r, prev] = await Promise.all([
-        http.post<BroadcastResponse>("/messaging/broadcast", { ...source, filtro: broadcastFilter(filtro), dryRun: true }),
-        http.post<{ texto: string }>("/messaging/templates/preview", { conteudo }),
+        http.post<BroadcastResponse>("/messaging/broadcast", { ...source, ...opts, filtro: broadcastFilter(filtro), dryRun: true }),
+        // No CSV a prévia é montada na tela com a primeira linha; aqui só a prévia de exemplo da carteira.
+        csv ? Promise.resolve({ texto: "" }) : http.post<{ texto: string }>("/messaging/templates/preview", { conteudo }),
       ]);
+      const agora = new Date().toISOString();
       return {
         total: r.total,
         optOut: r.ignorados.optOut,
-        estimativaMin: Math.ceil((r.total * 40) / 60),
+        invalidos: r.ignorados.invalidos ?? 0,
+        duplicados: r.ignorados.duplicados ?? 0,
+        lotes: r.estimativa?.lotes ?? 0,
+        inicioPrevisto: r.estimativa?.inicioPrevisto ?? agora,
+        terminoPrevisto: r.estimativa?.terminoPrevisto ?? agora,
         // Prévia com dados de exemplo: não expomos clientes reais aqui.
-        amostra: [{ clientId: "exemplo", nome: "Cliente de exemplo", telefone: "", texto: prev.texto }],
+        amostra: csv ? [] : [{ clientId: "exemplo", nome: "Cliente de exemplo", telefone: "", texto: prev.texto }],
       };
     },
-    broadcast: async (filtro: BroadcastFilter, source: BroadcastSource) => {
-      const r = await http.post<BroadcastResponse>("/messaging/broadcast", { ...source, filtro: broadcastFilter(filtro), dryRun: false });
-      return { enfileiradas: r.total };
+    broadcast: async (filtro: BroadcastFilter, source: BroadcastSource, opts: BroadcastOptions = {}): Promise<BroadcastResult> => {
+      const r = await http.post<BroadcastResponse>("/messaging/broadcast", { ...source, ...opts, filtro: broadcastFilter(filtro), dryRun: false });
+      return { enfileiradas: r.total, lotes: r.estimativa?.lotes ?? 0, terminoPrevisto: r.estimativa?.terminoPrevisto ?? null };
+    },
+    pacing: async (): Promise<MessagingPacing> => pacingVm(await http.get<MessagingSettingsDTO>("/messaging/settings")),
+    updatePacing: async (data: Partial<MessagingPacing>): Promise<MessagingPacing> => {
+      const body: Record<string, number> = {};
+      for (const k of ["intervaloMinSeg", "intervaloMaxSeg", "loteTamanho", "lotePausaMin"] as const) if (data[k] !== undefined) body[k] = data[k];
+      return pacingVm(await http.patch<MessagingSettingsDTO>("/messaging/settings", body));
+    },
+    uploadAttachment: (file: File, clientId?: string): Promise<MessageAttachment> => {
+      const fd = new FormData();
+      if (clientId) fd.append("clientId", clientId);
+      fd.append("arquivo", file, file.name);
+      return http.post<MessageAttachment>("/messaging/attachments", fd);
     },
     history: async (): Promise<Message[]> => (await http.get<ApiPage<MessageDTO>>("/messaging/history?pageSize=100")).data.map(message),
     queue: async (): Promise<Message[]> => (await http.get<MessagingQueueDTO>("/messaging/queue")).mensagens.map(message),

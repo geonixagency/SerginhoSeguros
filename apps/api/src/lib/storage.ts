@@ -25,11 +25,11 @@ export function toStorageRelative(absPath: string): string {
   return rel.split(path.sep).join("/");
 }
 
-/** Grava um upload em _uploads/aaaa/mm/<hash>.pdf (nome por hash = dedupe natural). */
-export async function saveUpload(buf: Buffer, ext = ".pdf"): Promise<{ caminho: string; hash: string; tamanho: number }> {
+/** Grava um upload em <base>/aaaa/mm/<hash><ext> (nome por hash = dedupe natural). */
+export async function saveUpload(buf: Buffer, ext = ".pdf", base = "_uploads"): Promise<{ caminho: string; hash: string; tamanho: number }> {
   const hash = sha256(buf);
   const now = new Date();
-  const dir = path.posix.join("_uploads", String(now.getUTCFullYear()), String(now.getUTCMonth() + 1).padStart(2, "0"));
+  const dir = path.posix.join(base, String(now.getUTCFullYear()), String(now.getUTCMonth() + 1).padStart(2, "0"));
   const caminho = path.posix.join(dir, `${hash}${ext}`);
   await mkdir(resolveStoragePath(dir), { recursive: true });
   await writeFile(resolveStoragePath(caminho), buf);

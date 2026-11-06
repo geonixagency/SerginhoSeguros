@@ -26,12 +26,13 @@ export async function startWorkers(log: FastifyBaseLogger) {
     MESSAGES_QUEUE,
     async (job: Job<{ messageId: string }>) => {
       const r = await processMessage(job.data.messageId);
-      // Intervalo aleatório entre envios (20–60 s por padrão): a fila tem concorrência 1,
+      // Intervalo aleatório entre envios (50–230 s por padrão): a fila tem concorrência 1,
       // então segurar o worker aqui espaça naturalmente as mensagens.
       if (r.pausaMs) await sleep(r.pausaMs);
       return r;
     },
-    { connection: createRedis(), concurrency: 1, lockDuration: 180_000 },
+    // Lock maior que o intervalo máximo permitido (540 s) para o job não ser dado como travado.
+    { connection: createRedis(), concurrency: 1, lockDuration: 600_000 },
   );
   messages.on("failed", async (job, err) => {
     if (!job) return;

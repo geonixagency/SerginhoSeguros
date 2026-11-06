@@ -109,6 +109,10 @@ export interface DemoDB {
   rules: MessageRule[];
   messages: Message[];
   instance: WhatsappInstance;
+  /** Ritmo dos disparos (criado na primeira leitura; demos antigos no navegador não têm). */
+  pacing?: { intervaloMinSeg: number; intervaloMaxSeg: number; loteTamanho: number; lotePausaMin: number };
+  /** Anexos de mensagem subidos no demo (id -> nome). */
+  anexos?: Record<string, string>;
 }
 
 export const DEFAULT_RULE_TEXTS = {

@@ -457,8 +457,8 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
       </Tabs>
 
       <ClientFormDialog open={editing} onOpenChange={setEditing} client={c} />
-      <PolicyFormDialog key={polForm === undefined ? "closed" : (polForm?.id ?? "nova")} open={polForm !== undefined} onOpenChange={(o) => !o && setPolForm(undefined)} client={c} policy={polForm} />
-      <AttachDialog key={attach ? "open" : "closed"} open={attach} onOpenChange={setAttach} client={c} />
+      <PolicyFormDialog key={polForm === undefined ? "pol-closed" : `pol-${polForm?.id ?? "nova"}`} open={polForm !== undefined} onOpenChange={(o) => !o && setPolForm(undefined)} client={c} policy={polForm} />
+      <AttachDialog key={attach ? "att-open" : "att-closed"} open={attach} onOpenChange={setAttach} client={c} />
 
       <SendWhatsAppDialog
         open={wa}
