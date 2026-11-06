@@ -1,0 +1,22 @@
+{
+  "apolice": {
+    "numero": "0531-99887766",
+    "ramo": "Automóvel",
+    "produto": "Auto Individual",
+    "situacao": "VIGENTE",
+    "inicioVigencia": "01/03/2026",
+    "fimVigencia": "01/03/2027",
+    "formaPagamento": "BOLETO",
+    "veiculo": { "placa": "ABC1D23" }
+  },
+  "cliente": {
+    "nome": "Cliente Ficticio Um",
+    "telefone": "(14) 99999-0001",
+    "email": "ficticio.um@exemplo.invalid",
+    "telefones": [ { "ddd": "14", "numero": "999990001" } ]
+  },
+  "parcelas": [
+    { "numeroParcela": 1, "situacao": "Pago", "dataVencimento": "10/03/2026", "valor": "R$ 350,00", "dataPagamento": "09/03/2026", "tipoCobranca": "Boleto", "acaoSegundaVia": true },
+    { "numeroParcela": 2, "situacao": "Em aberto", "dataVencimento": "10/04/2026", "valor": "R$ 350,00", "dataPagamento": null, "tipoCobranca": "Boleto", "acaoPix": true, "acaoSegundaVia": true }
+  ]
+}

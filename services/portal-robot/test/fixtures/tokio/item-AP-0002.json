@@ -1,0 +1,10 @@
+{
+  "apolice": {
+    "numero": "0118-55443322", "ramo": "Residencial", "produto": "Resid Total",
+    "situacao": "VIGENTE", "inicioVigencia": "2026-02-01", "fimVigencia": "2027-02-01", "formaPagamento": "PIX"
+  },
+  "cliente": { "nome": "Cliente Ficticio Um", "email": "ficticio.um@exemplo.invalid" },
+  "parcelas": [
+    { "numeroParcela": 1, "situacao": "Vencida", "dataVencimento": "05/10/2026", "valor": "R$ 120,50", "tipoCobranca": "PIX", "acaoPix": true }
+  ]
+}

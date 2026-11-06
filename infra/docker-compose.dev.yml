@@ -1,0 +1,17 @@
+# Overrides de desenvolvimento: expõe portas SÓ em 127.0.0.1 (nunca na rede).
+# Portas altas para não colidir com Postgres/Redis já instalados na máquina.
+services:
+  postgres:
+    ports: ["127.0.0.1:15432:5432"]
+  redis:
+    ports: ["127.0.0.1:16379:6379"]
+  pdf-parser:
+    ports: ["127.0.0.1:8001:8001"]
+  portal-robot:
+    ports: ["127.0.0.1:8020:8020"]
+  api:
+    ports: ["127.0.0.1:3333:3333"]
+    environment:
+      NODE_ENV: production
+      EVOLUTION_MOCK: ${EVOLUTION_MOCK:-true}
+      CONNECTORS_DEMO: ${CONNECTORS_DEMO:-false}

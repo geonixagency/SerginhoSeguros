@@ -1,0 +1,22 @@
+# Produção (VPS): só o Caddy expõe portas (80/443). API, banco, Redis e parser ficam na rede interna.
+services:
+  api:
+    environment:
+      COOKIE_SECURE: "true"
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-none}
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ["80:80", "443:443"]
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?defina API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

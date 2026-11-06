@@ -1,0 +1,121 @@
+# Base (dev e prod). Variáveis vêm de --env-file (dev: ../apps/api/.env.local; prod: infra/.env).
+#   Dev  : docker compose --env-file apps/api/.env.local -f infra/docker-compose.yml -f infra/docker-compose.dev.yml up -d
+#   Prod : docker compose --env-file infra/.env -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d
+name: serginho
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: serginho
+      POSTGRES_DB: serginho
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      TZ: America/Sao_Paulo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U serginho -d serginho"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # AOF ligado: a fila de mensagens sobrevive a reinício.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  pdf-parser:
+    build:
+      context: ../services/pdf-parser
+    restart: unless-stopped
+    environment:
+      PDF_PARSER_TOKEN: ${PDF_PARSER_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Robô de portais (canal rpa: Tokio e Porto). Só na rede interna; nunca exposto pelo Caddy.
+  # Imagem oficial do Playwright já traz o Chromium e suas dependências.
+  portal-robot:
+    build:
+      context: ..
+      dockerfile: services/portal-robot/Dockerfile
+    restart: unless-stopped
+    environment:
+      ROBOT_TOKEN: ${PORTAL_ROBOT_TOKEN:?defina PORTAL_ROBOT_TOKEN}
+      ROBOT_PROFILE_DIR: /profiles
+      ROBOT_HEADLESS: ${ROBOT_HEADLESS:-true}
+      ROBOT_VNC_URL: ${ROBOT_VNC_URL:-}
+      ROBOT_DEBUG_SHAPES: ${ROBOT_DEBUG_SHAPES:-false}
+      # Ritmo humano e poucas execuções por dia (CLAUDE.md, regra 3).
+      ROBOT_MAX_LOGINS_PER_DAY: ${ROBOT_MAX_LOGINS_PER_DAY:-3}
+      ROBOT_MAX_QUERIES_PER_DAY: ${ROBOT_MAX_QUERIES_PER_DAY:-300}
+      TZ: America/Sao_Paulo
+    volumes:
+      # Perfis com sessão viva dos portais: pasta no host, FORA do repositório.
+      - ${ROBOT_PROFILE_HOST_DIR:-robot_profiles}:/profiles
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8020/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      pdf-parser: { condition: service_started }
+      portal-robot: { condition: service_started }
+    environment:
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: postgresql://serginho:${POSTGRES_PASSWORD}@postgres:5432/serginho?schema=public
+      REDIS_URL: redis://redis:6379
+      PDF_PARSER_URL: http://pdf-parser:8001
+      PDF_PARSER_TOKEN: ${PDF_PARSER_TOKEN:-}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?defina APP_ENCRYPTION_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      STORAGE_DIR: /storage
+      EVOLUTION_URL: ${EVOLUTION_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-serginho-seguros}
+      EVOLUTION_MOCK: ${EVOLUTION_MOCK:-false}
+      EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN:-}
+      AGGILIZADOR_BASE_URL: ${AGGILIZADOR_BASE_URL:-}
+      CONNECTORS_DEMO: ${CONNECTORS_DEMO:-false}
+      PORTAL_ROBOT_URL: http://portal-robot:8020
+      PORTAL_ROBOT_TOKEN: ${PORTAL_ROBOT_TOKEN:?defina PORTAL_ROBOT_TOKEN}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@serginhoseguros.com.br}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+    volumes:
+      # PDFs ficam FORA do repositório; STORAGE_HOST_DIR aponta para a pasta no host.
+      - ${STORAGE_HOST_DIR:-storage}:/storage
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3333/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:
+  robot_profiles:

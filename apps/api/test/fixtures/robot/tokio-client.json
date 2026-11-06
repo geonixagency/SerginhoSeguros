@@ -1,0 +1,15 @@
+{
+  "cpfCnpj": "11144477735",
+  "apolices": [
+    {
+      "idPortal": "AP-1", "numero": "0531-99887766", "ramo": "Automóvel", "produto": "Auto",
+      "situacao": "VIGENTE", "inicioVigencia": "2026-03-01", "fimVigencia": "2027-03-01",
+      "formaPagamento": "BOLETO", "placa": "ABC1D23",
+      "parcelas": [
+        { "numero": 1, "situacao": "PAGA", "vencimento": "2026-03-10", "valor": 350, "dataPagamento": "2026-03-09", "tipoCobranca": "Boleto", "acaoPix": false, "acaoSegundaVia": true },
+        { "numero": 2, "situacao": "VENCIDA", "vencimento": "2026-04-10", "valor": 350, "dataPagamento": null, "tipoCobranca": "Boleto", "acaoPix": true, "acaoSegundaVia": true }
+      ]
+    }
+  ],
+  "contato": { "nome": "Cliente Ficticio Um", "telefones": ["14999990001"], "emails": ["ficticio.um@exemplo.invalid"] }
+}

@@ -1,0 +1,11 @@
+{
+  "page": { "count": 3, "totalPages": 2 },
+  "results": [
+    { "number": 2, "status": 1, "dueDate": "2026-10-20", "value": 489.9, "paymentType": { "code": "1" }, "paymentTitle": "Parcela 02", "system": "0",
+      "contract": { "companyCode": "06", "productId": "18", "client": { "document": "11144477735", "civilName": "Cliente Ficticio Dois" } },
+      "metaData": { "sapPolicy": "0531-12345678", "proposal": "PRO-777", "endorsement": "" } },
+    { "number": 3, "status": 1, "dueDate": "2026-10-25", "value": 489.9, "paymentType": { "code": "41" }, "paymentTitle": "Parcela 03", "system": "0",
+      "contract": { "companyCode": "06", "productId": "18", "client": { "document": "11144477735", "civilName": "Cliente Ficticio Dois" } },
+      "metaData": { "sapPolicy": "0531-12345678", "proposal": "PRO-777", "endorsement": "" } }
+  ]
+}

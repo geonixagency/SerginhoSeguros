@@ -1,0 +1,4 @@
+# Perfis de navegador têm cookies de sessão dos portais: NUNCA versionar.
+profiles/
+.profiles/
+dist/

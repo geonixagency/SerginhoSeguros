@@ -1,0 +1,8 @@
+{
+  "page": { "count": 3, "totalPages": 2 },
+  "results": [
+    { "number": 1, "status": 4, "dueDate": "2026-09-20", "value": 489.9, "paymentDate": "2026-09-18", "paymentType": { "code": "1" }, "paymentTitle": "Parcela 01", "system": "0",
+      "contract": { "companyCode": "06", "productId": "18", "client": { "document": "11144477735", "civilName": "Cliente Ficticio Dois" } },
+      "metaData": { "sapPolicy": "0531-12345678", "proposal": "PRO-777", "endorsement": "" } }
+  ]
+}

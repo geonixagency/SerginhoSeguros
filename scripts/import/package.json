@@ -1,0 +1,23 @@
+{
+  "name": "@ss/import",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Importa ../_dados/clients.json e policies.json (sa\u00c3\u00adda do extrator) para o Postgres",
+  "scripts": {
+    "start": "cd ../../apps/api && tsx ../../scripts/import/src/index.ts",
+    "dry-run": "cd ../../apps/api && tsx ../../scripts/import/src/index.ts --dry-run",
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "pnpm typecheck",
+    "test": "echo sem testes"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.0",
+    "@types/node": "^22.15.0"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "@ss/shared": "workspace:*"
+  }
+}

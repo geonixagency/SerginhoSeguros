@@ -1,0 +1,108 @@
+/*
+ * Serginho Seguros — tokens de design
+ * Paleta extraída da logo: preto nanquim + ouro em degradê (#F5C518 → #B8860B).
+ * Direção: "ouro sobre nanquim" — editorial, sóbrio, de banco privado. Ouro é
+ * acento (nunca fundo de página); o claro usa papel marfim, o escuro usa nanquim.
+ * Documentação: apps/web/DESIGN.md
+ */
+:root {
+  /* Primitivos — ouro */
+  --gold-50: #fff9e6;
+  --gold-100: #fcefc2;
+  --gold-200: #f8df88;
+  --gold-300: #f4cd4f;
+  --gold-400: #eebd25; /* ouro da logo */
+  --gold-500: #d8a218;
+  --gold-600: #b7840f;
+  --gold-700: #8c640b; /* ouro para texto sobre marfim (AA) */
+  --gold-800: #684a0d;
+  --gold-900: #46320c;
+
+  /* Primitivos — nanquim / marfim */
+  --ink-950: #09090a;
+  --ink-900: #0f0f11;
+  --ink-850: #141416;
+  --ink-800: #1a1a1d;
+  --ink-700: #26262a;
+  --ink-600: #36363b;
+  --ivory-50: #fcfaf5;
+  --ivory-100: #f7f3ea;
+  --ivory-200: #efe8d9;
+  --ivory-300: #e2d9c5;
+
+  /* Semânticos — modo claro */
+  --background: var(--ivory-100);
+  --surface: #fffdf8;
+  --surface-2: var(--ivory-50);
+  --surface-sunken: var(--ivory-200);
+  --foreground: #16140f;
+  --muted-foreground: #645e53;
+  --subtle-foreground: #8a8376;
+  --border: #e4dccb;
+  --border-strong: #cfc4ad;
+  --primary: var(--ink-900);
+  --primary-foreground: var(--gold-300);
+  --accent: var(--gold-400);
+  --accent-foreground: var(--ink-950);
+  --accent-text: var(--gold-700);
+  --accent-soft: #f8edc9;
+  --ring: var(--gold-600);
+  --success: #2f7a4f;
+  --success-soft: #e3f1e7;
+  --warning: #b4530f;
+  --warning-soft: #fbeadb;
+  --danger: #b42318;
+  --danger-soft: #fbe4e1;
+  --info: #1e5a8a;
+  --info-soft: #e1edf6;
+  --sidebar: var(--ink-900);
+  --sidebar-foreground: #e9e4d8;
+  --sidebar-muted: #9a958a;
+  --sidebar-border: #24242a;
+  --chart-1: #d8a218;
+  --chart-2: #2b2822;
+  --chart-3: #9c6b3c;
+  --chart-4: #5f7f6a;
+  --chart-5: #476a8a;
+  --chart-6: #b4533a;
+  --shadow-color: 36 28% 30%;
+  --radius: 14px;
+}
+
+.dark {
+  --background: var(--ink-950);
+  --surface: var(--ink-850);
+  --surface-2: var(--ink-900);
+  --surface-sunken: #060607;
+  --foreground: #f3eee3;
+  --muted-foreground: #aaa496;
+  --subtle-foreground: #7d786d;
+  --border: #27272c;
+  --border-strong: #38383e;
+  --primary: var(--gold-400);
+  --primary-foreground: var(--ink-950);
+  --accent: var(--gold-400);
+  --accent-foreground: var(--ink-950);
+  --accent-text: var(--gold-300);
+  --accent-soft: #2a220e;
+  --ring: var(--gold-400);
+  --success: #5cc488;
+  --success-soft: #11291b;
+  --warning: #f0904a;
+  --warning-soft: #2e1a0c;
+  --danger: #f2756a;
+  --danger-soft: #2f1310;
+  --info: #7bb4e3;
+  --info-soft: #0f2233;
+  --sidebar: #070708;
+  --sidebar-foreground: #e9e4d8;
+  --sidebar-muted: #8a857a;
+  --sidebar-border: #1d1d21;
+  --chart-1: #eebd25;
+  --chart-2: #e9e4d8;
+  --chart-3: #c08a52;
+  --chart-4: #7fae8f;
+  --chart-5: #78a4cf;
+  --chart-6: #e07a5f;
+  --shadow-color: 0 0% 0%;
+}

@@ -1,0 +1,8 @@
+{
+  "Id": "fx-quot-0001",
+  "Results": [
+    { "Seguradora": "Seguradora Fixture B", "Premio": 2890.4, "Franquia": 3100, "Parcelamento": "10x" },
+    { "Seguradora": "Seguradora Fixture A", "Premio": 2410.0, "Franquia": 2800, "Parcelamento": "12x" },
+    { "Seguradora": "Sem preço", "Premio": 0 }
+  ]
+}

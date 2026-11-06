@@ -1,0 +1,28 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# API pública (o frontend roda na Vercel). TLS automático via Let's Encrypt.
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	# Uploads de PDF até ~20 MB.
+	request_body {
+		max_size 25MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	# Só /api/* é exposto; o pdf-parser NÃO é publicado.
+	handle /api/* {
+		reverse_proxy api:3333
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

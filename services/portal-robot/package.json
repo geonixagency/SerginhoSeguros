@@ -1,0 +1,27 @@
+{
+  "name": "@ss/portal-robot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Robô de portais (Playwright) — canal rpa de Tokio Marine e Porto Seguro. Só na rede interna.",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsup src/server.ts --format esm --target node22 --clean",
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "fastify": "^5.4.0",
+    "playwright-core": "1.56.1",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

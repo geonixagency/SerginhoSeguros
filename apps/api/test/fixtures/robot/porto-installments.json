@@ -1,0 +1,10 @@
+{
+  "total": 2, "paginas": 1,
+  "parcelas": [
+    { "numero": 1, "situacao": "PAGA", "vencimento": "2026-09-20", "valor": 489.9, "dataPagamento": "2026-09-18", "tipoCobranca": "1", "acaoPix": false, "acaoSegundaVia": false,
+      "apolice": "0531-12345678", "endosso": "", "proposta": "PRO-777", "cpfCnpj": "11144477735", "nomeCliente": "Cliente Ficticio Dois", "produtoId": 18, "debitoRecusado": false, "chaveBoleto": null },
+    { "numero": 2, "situacao": "VENCIDA", "vencimento": "2026-10-20", "valor": 489.9, "dataPagamento": null, "tipoCobranca": "1", "acaoPix": false, "acaoSegundaVia": true,
+      "apolice": "0531-12345678", "endosso": "", "proposta": "PRO-777", "cpfCnpj": "11144477735", "nomeCliente": "Cliente Ficticio Dois", "produtoId": 18, "debitoRecusado": false,
+      "chaveBoleto": { "paymentTitle": "Parcela 02", "companyCode": "06", "paymentTypeCode": "1", "policy": "053112345678", "productId": "18", "system": "0", "proposal": "PRO-777", "installmentNumber": "2" } }
+  ]
+}

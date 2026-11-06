@@ -1,0 +1,6 @@
+{
+  "apolices": [
+    { "id": "AP-0001", "numero": "0531-99887766", "ramo": "Automóvel", "situacao": "VIGENTE" },
+    { "id": "AP-0002", "numero": "0118-55443322", "ramo": "Residencial", "situacao": "VIGENTE" }
+  ]
+}

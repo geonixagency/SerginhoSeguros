@@ -1,0 +1,17 @@
+{
+  "name": "serginho-seguros",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.34.7",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev:api": "pnpm --filter @ss/api dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @ss/api db:migrate",
+    "db:seed": "pnpm --filter @ss/api db:seed",
+    "import:carteira": "pnpm --filter @ss/import start"
+  }
+}
