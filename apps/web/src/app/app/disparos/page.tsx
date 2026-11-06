@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
@@ -138,6 +138,19 @@ function ConnectionTab() {
   });
   const disconnect = useMutation({ mutationFn: api.messaging.disconnect, onSuccess: set });
   const pause = useMutation({ mutationFn: (pausado: boolean) => api.messaging.updateInstance({ pausado }), onSuccess: set });
+
+  // O QR do WhatsApp expira em ~20 s: enquanto espera a leitura, busca um código novo sozinho
+  // (e um primeiro, se a tela abriu já "aguardando" sem QR em mãos).
+  const aguardando = inst?.status === "AGUARDANDO_QR";
+  const semQr = aguardando && !inst?.qrCode;
+  const connectRef = useRef(connect.mutate);
+  connectRef.current = connect.mutate;
+  useEffect(() => {
+    if (!aguardando || IS_DEMO) return;
+    if (semQr) connectRef.current();
+    const t = setInterval(() => connectRef.current(), 20_000);
+    return () => clearInterval(t);
+  }, [aguardando, semQr]);
 
   if (isError) return <Card><ErrorState onRetry={() => refetch()} /></Card>;
   if (isLoading || !inst) return <Skeleton className="h-80 rounded-[var(--radius-lg)]" />;
