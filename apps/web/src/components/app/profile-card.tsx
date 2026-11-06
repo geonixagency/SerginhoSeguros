@@ -211,9 +211,9 @@ export function ProfileCard() {
         </div>
 
         {/* nome e senha */}
-        <div className="grid content-start gap-5">
+        <div className="grid min-w-0 content-start gap-5">
           <form
-            className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
+            className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
             onSubmit={(e) => {
               e.preventDefault();
               if (nome.trim().length < 2) return toast.error("Informe seu nome.");
@@ -235,8 +235,8 @@ export function ProfileCard() {
               <KeyRound className="size-4 text-accent-text" /> Redefinir senha
             </p>
             <p className="mt-1 text-sm text-muted">Enviamos um link para o seu e-mail. Ele vale por 1 hora e só funciona uma vez.</p>
-            <Button variant="outline" className="mt-3" onClick={() => reset.mutate()} loading={reset.isPending}>
-              <Mail /> Enviar link para {user.email}
+            <Button variant="outline" className="mt-3 max-w-full" onClick={() => reset.mutate()} loading={reset.isPending}>
+              <Mail /> <span className="truncate">Enviar link para {user.email}</span>
             </Button>
             {mailError && (
               <p role="alert" className="mt-3 rounded-lg bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
