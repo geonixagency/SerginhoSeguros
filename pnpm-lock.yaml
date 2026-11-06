@@ -255,7 +255,7 @@ importers:
         specifier: ^5.4.0
         version: 5.12.8
       playwright-core:
-        specifier: ~1.56.1
+        specifier: 1.56.1
         version: 1.56.1
       zod:
         specifier: ^4.1.0
