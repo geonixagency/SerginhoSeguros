@@ -35,6 +35,20 @@ export interface User {
   perfil: Perfil;
   /** Data URL da foto de perfil (null/ausente = iniciais). */
   avatar?: string | null;
+  ativo?: boolean;
+  /** ISO. null = nunca entrou (convite pendente). */
+  ultimoLogin?: string | null;
+}
+export interface InviteInput {
+  nome: string;
+  email: string;
+  perfil: Perfil;
+}
+export interface InviteResult {
+  user: User;
+  emailEnviado: boolean;
+  /** Só quando o e-mail não pôde ser enviado: o ADMIN repassa o link manualmente. */
+  link?: string;
 }
 export interface ProfileUpdate {
   nome?: string;

@@ -35,7 +35,15 @@ Em produção (front na Vercel e API na VPS) o cookie é `Secure; SameSite=None`
 
 ## Usuários
 
-`GET /users`, `POST /users` **[ADMIN]** (`UserCreateSchema`) e `PATCH /users/:id` **[ADMIN]**.
+| Método | Rota | Corpo / observações |
+|---|---|---|
+| GET | `/users` | Lista a equipe (ativos primeiro). E-mail e último acesso só para ADMIN. `ultimoLogin: null` = convite pendente. |
+| POST | `/users/invite` **[ADMIN]** | `UserInviteSchema` `{ nome, email, perfil }`. Cria o usuário sem senha utilizável e envia por e-mail `WEB_URL/redefinir-senha?convite=1&token=...` (72 h, uso único; mesma tabela da redefinição). Reenvia para quem ainda não entrou; `409` se o e-mail já tem acesso. Devolve `{ user, emailEnviado, link? }`: o `link` só vem quando o SMTP não está configurado ou o envio falhou, para o ADMIN repassar. |
+| POST | `/users` **[ADMIN]** | `UserCreateSchema` (com senha definida pelo ADMIN). |
+| PATCH | `/users/:id` **[ADMIN]** | `{ nome?, perfil?, ativo?, senha? }`. Não deixa rebaixar/desativar a si mesmo nem o último ADMIN ativo. |
+| DELETE | `/users/:id` **[ADMIN]** | Remove da equipe = desativa (soft delete), encerra sessões e links pendentes. Mesmas travas do PATCH. |
+
+Tudo auditado (`CONVIDAR`, `REENVIAR_CONVITE`, `ATUALIZAR`, `REMOVER`).
 
 ## Importação da carteira **[ADMIN]**
 

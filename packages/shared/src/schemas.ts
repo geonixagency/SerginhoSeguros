@@ -52,6 +52,12 @@ export const UserCreateSchema = z.object({
   senha: z.string().min(10, "A senha deve ter ao menos 10 caracteres").max(200),
   perfil: PerfilSchema.default("OPERADOR"),
 });
+/** Convite: cria o usuário sem senha utilizável e envia por e-mail o link "defina sua senha" (72 h). */
+export const UserInviteSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome").max(120),
+  email: z.string().trim().toLowerCase().email("E-mail inválido"),
+  perfil: PerfilSchema.default("OPERADOR"),
+});
 export const UserUpdateSchema = z.object({
   nome: z.string().trim().min(2).max(120).optional(),
   senha: z.string().min(10).max(200).optional(),

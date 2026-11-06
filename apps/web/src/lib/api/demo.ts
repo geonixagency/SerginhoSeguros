@@ -70,13 +70,17 @@ function route(method: string, path: string, handler: Handler) {
 }
 
 /* ---------------- auth ---------------- */
-const DEMO_USER: User = { id: "usr-1", nome: "Viviani Rosalim", email: "viviani@serginhoseguros.com.br", perfil: "ADMIN", avatar: null };
+const DEMO_USER: User = { id: "usr-1", nome: "Conta Demonstração", email: "demo@exemplo.com", perfil: "ADMIN", avatar: null, ativo: true, ultimoLogin: new Date().toISOString() };
+/* Equipe fictícia do modo demonstração (nomes e e-mails inventados). */
+const demoTeam: User[] = [
+  DEMO_USER,
+  { id: "usr-2", nome: "Operador Exemplo", email: "operador@exemplo.com", perfil: "OPERADOR", avatar: null, ativo: true, ultimoLogin: new Date(Date.now() - 86400_000).toISOString() },
+];
 route("POST", "/auth/login", ({ body }) => {
   const b = body as { email?: string; senha?: string };
   if (!b?.email || !b?.senha) throw new DemoHttpError(400, "Informe e-mail e senha.");
   if (b.senha.length < 4) throw new DemoHttpError(401, "E-mail ou senha inválidos.");
-  const nome = b.email.startsWith("sergio") ? "Sergio Rosalim" : DEMO_USER.nome;
-  return { accessToken: "demo-token", user: { ...DEMO_USER, nome, email: b.email } };
+  return { accessToken: "demo-token", user: { ...DEMO_USER } };
 });
 route("POST", "/auth/refresh", () => ({ accessToken: "demo-token", user: DEMO_USER }));
 route("POST", "/auth/logout", () => ({ ok: true }));
@@ -91,6 +95,34 @@ route("PATCH", "/auth/me", ({ body }) => {
   return { ...DEMO_USER };
 });
 route("POST", "/auth/forgot-password", () => ({ ok: true }));
+route("GET", "/users", () => demoTeam.map((u) => (u.id === DEMO_USER.id ? { ...DEMO_USER } : { ...u })));
+route("POST", "/users/invite", ({ body }) => {
+  const b = body as { nome?: string; email?: string; perfil?: User["perfil"] };
+  const email = (b.email ?? "").trim().toLowerCase();
+  if (!b.nome || b.nome.trim().length < 2) throw new DemoHttpError(400, "Informe o nome");
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new DemoHttpError(400, "E-mail inválido");
+  const ex = demoTeam.find((u) => u.email === email);
+  if (ex?.ultimoLogin && ex.ativo) throw new DemoHttpError(409, "Este e-mail já tem acesso ao sistema");
+  const user: User = ex ?? { id: `usr-${Date.now()}`, nome: b.nome.trim(), email, perfil: b.perfil ?? "OPERADOR", avatar: null, ativo: true, ultimoLogin: null };
+  Object.assign(user, { nome: b.nome.trim(), perfil: b.perfil ?? "OPERADOR", ativo: true });
+  if (!ex) demoTeam.push(user);
+  return { user: { ...user }, emailEnviado: true };
+});
+route("PATCH", "/users/:id", ({ params, body }) => {
+  const u = demoTeam.find((x) => x.id === params.id);
+  if (!u) throw new DemoHttpError(404, "Usuário não encontrado");
+  const b = body as { perfil?: User["perfil"]; ativo?: boolean };
+  if (u.id === DEMO_USER.id && (b.ativo === false || (b.perfil && b.perfil !== "ADMIN"))) throw new DemoHttpError(400, "Você não pode desativar nem rebaixar o próprio usuário");
+  Object.assign(u, b);
+  return { ...u };
+});
+route("DELETE", "/users/:id", ({ params }) => {
+  const u = demoTeam.find((x) => x.id === params.id);
+  if (!u) throw new DemoHttpError(404, "Usuário não encontrado");
+  if (u.id === DEMO_USER.id) throw new DemoHttpError(400, "Você não pode remover o próprio usuário");
+  u.ativo = false;
+  return { ...u };
+});
 route("POST", "/auth/reset-password", ({ body }) => {
   const b = body as { token?: string; senha?: string };
   if (!b.token || b.token.length < 20) throw new DemoHttpError(400, "Link inválido ou expirado. Peça um novo link de redefinição.");

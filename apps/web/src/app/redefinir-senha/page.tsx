@@ -72,7 +72,7 @@ function PedirLink() {
   );
 }
 
-function NovaSenha({ token }: { token: string }) {
+function NovaSenha({ token, convite }: { token: string; convite: boolean }) {
   const [senha, setSenha] = useState("");
   const [confirma, setConfirma] = useState("");
   const [show, setShow] = useState(false);
@@ -101,7 +101,7 @@ function NovaSenha({ token }: { token: string }) {
       <div role="status" className="grid gap-4">
         <div className="flex items-start gap-3 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm">
           <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
-          <p>Senha alterada. Por segurança, as sessões abertas em outros aparelhos foram encerradas.</p>
+          <p>{convite ? "Senha criada. Agora é só entrar com seu e-mail e a senha nova." : "Senha alterada. Por segurança, as sessões abertas em outros aparelhos foram encerradas."}</p>
         </div>
         <Button asChild size="lg" className="w-full">
           <Link href="/login">Entrar com a senha nova</Link>
@@ -113,7 +113,7 @@ function NovaSenha({ token }: { token: string }) {
   return (
     <form onSubmit={onSubmit} className="grid gap-5" noValidate>
       <div className="grid gap-1.5">
-        <Label htmlFor="senha">Senha nova</Label>
+        <Label htmlFor="senha">{convite ? "Sua senha" : "Senha nova"}</Label>
         <div className="relative">
           <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
           <Input id="senha" type={show ? "text" : "password"} autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} className="h-11 px-9" aria-invalid={!!error} aria-describedby="senha-dica" />
@@ -126,7 +126,7 @@ function NovaSenha({ token }: { token: string }) {
         </p>
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="confirma">Repita a senha nova</Label>
+        <Label htmlFor="confirma">Repita a senha</Label>
         <div className="relative">
           <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
           <Input id="confirma" type={show ? "text" : "password"} autoComplete="new-password" value={confirma} onChange={(e) => setConfirma(e.target.value)} className="h-11 pl-9" aria-invalid={!!error} />
@@ -139,7 +139,7 @@ function NovaSenha({ token }: { token: string }) {
         </Link>
       )}
       <Button type="submit" size="lg" loading={loading} className="w-full">
-        Salvar senha nova
+        {convite ? "Criar minha senha" : "Salvar senha nova"}
       </Button>
     </form>
   );
@@ -158,16 +158,23 @@ function Conteudo() {
   const token = params.get("token");
   // Tira o token da barra de endereço (histórico e capturas de tela) depois de lido.
   const [tk] = useState(token);
+  const [convite] = useState(params.get("convite") === "1");
   useEffect(() => {
     if (token) window.history.replaceState(null, "", "/redefinir-senha");
   }, [token]);
 
   return (
     <>
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent-text">{tk ? "Nova senha" : "Esqueci minha senha"}</p>
-      <h1 className="mt-2 font-display text-4xl font-semibold leading-tight">{tk ? "Crie sua senha nova." : "Vamos te ajudar a entrar."}</h1>
-      <p className="mt-2 text-[15px] text-muted">{tk ? "Depois de salvar, use a senha nova para entrar." : "Informe o e-mail de acesso. Enviamos um link para você criar uma senha nova."}</p>
-      <div className="mt-7">{tk ? <NovaSenha token={tk} /> : <PedirLink />}</div>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent-text">{tk ? (convite ? "Primeiro acesso" : "Nova senha") : "Esqueci minha senha"}</p>
+      <h1 className="mt-2 font-display text-4xl font-semibold leading-tight">{tk ? (convite ? "Boas-vindas à equipe." : "Crie sua senha nova.") : "Vamos te ajudar a entrar."}</h1>
+      <p className="mt-2 text-[15px] text-muted">
+        {tk
+          ? convite
+            ? "Crie a senha que você vai usar para entrar no sistema da Serginho Seguros."
+            : "Depois de salvar, use a senha nova para entrar."
+          : "Informe o e-mail de acesso. Enviamos um link para você criar uma senha nova."}
+      </p>
+      <div className="mt-7">{tk ? <NovaSenha token={tk} convite={convite} /> : <PedirLink />}</div>
     </>
   );
 }
@@ -190,7 +197,7 @@ export default function RedefinirSenhaPage() {
             <Conteudo />
           </Suspense>
           <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-subtle">
-            <KeyRound className="size-3.5" /> O link só funciona uma vez e expira em 1 hora.
+            <KeyRound className="size-3.5" /> O link só funciona uma vez e tem prazo de validade.
           </p>
         </motion.div>
       </div>

@@ -26,6 +26,8 @@ export interface UserDTO {
   ativo: boolean;
   /** Data URL da foto de perfil (null = sem foto). */
   avatar?: string | null;
+  /** ISO. null = nunca entrou (convite pendente). */
+  ultimoLogin?: string | null;
 }
 
 export interface LoginResponse {

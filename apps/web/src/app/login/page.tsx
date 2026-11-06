@@ -20,7 +20,7 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/app";
-  const [email, setEmail] = useState(IS_DEMO ? "viviani@serginhoseguros.com.br" : "");
+  const [email, setEmail] = useState(IS_DEMO ? "demo@exemplo.com" : "");
   const [senha, setSenha] = useState(IS_DEMO ? "demo2026" : "");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);

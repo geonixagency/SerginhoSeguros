@@ -35,7 +35,7 @@ import { diffDays, todayIso, toIsoDate } from "./dates";
 
 export const money = (d: Prisma.Decimal | null | undefined): string | null => (d == null ? null : d.toFixed(2));
 
-export const userDTO = (u: User): UserDTO => ({ id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, ativo: u.ativo, avatar: u.avatar ?? null });
+export const userDTO = (u: User): UserDTO => ({ id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, ativo: u.ativo, avatar: u.avatar ?? null, ultimoLogin: u.ultimoLogin ? u.ultimoLogin.toISOString() : null });
 
 export const insurerSummary = (i: Pick<Insurer, "id" | "nome" | "slug">): InsurerSummaryDTO => ({
   id: i.id,

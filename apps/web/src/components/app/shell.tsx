@@ -79,7 +79,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <Avatar nome={user?.nome ?? "Equipe"} src={user?.avatar} className="size-9" tone="gold" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-ivory-50">{user?.nome ?? "—"}</span>
-              <span className="block truncate text-xs text-sidebar-muted">{user?.perfil === "ADMIN" ? "Administradora" : "Operador"}</span>
+              <span className="block truncate text-xs text-sidebar-muted">{user?.perfil === "ADMIN" ? "Administrador" : "Operador"}</span>
             </span>
             <ChevronsUpDown className="size-4 text-sidebar-muted" />
           </DropdownMenuTrigger>

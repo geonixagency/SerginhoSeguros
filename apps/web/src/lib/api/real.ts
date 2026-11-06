@@ -71,6 +71,9 @@ import type {
   CreateTemplateInput,
   ProfileUpdate,
   ImportEstado,
+  InviteInput,
+  InviteResult,
+  Perfil,
   ImportJob,
   PdfBatchStats,
   BroadcastSource,
@@ -565,6 +568,12 @@ export const realApi = {
     updateProfile: (data: ProfileUpdate) => http.patch<User>("/auth/me", data),
     forgotPassword: (email: string) => http.post<{ ok: boolean }>("/auth/forgot-password", { email }),
     resetPassword: (token: string, senha: string) => http.post<{ ok: boolean }>("/auth/reset-password", { token, senha }),
+  },
+  equipe: {
+    list: () => http.get<User[]>("/users"),
+    invite: (data: InviteInput) => http.post<InviteResult>("/users/invite", data),
+    update: (id: string, data: { perfil?: Perfil; ativo?: boolean }) => http.patch<User>(`/users/${id}`, data),
+    remove: (id: string) => http.del<User>(`/users/${id}`),
   },
   importacao: {
     estado: () => http.get<ImportEstado>("/import/estado"),
