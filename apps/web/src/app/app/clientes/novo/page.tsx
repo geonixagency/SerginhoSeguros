@@ -288,7 +288,7 @@ function Review({
 }) {
   const counts = useMemo(() => {
     const c = { alto: 0, medio: 0, baixo: 0 };
-    result.campos.forEach((f) => (f.confianca >= 0.85 ? c.alto++ : f.confianca >= 0.65 ? c.medio++ : c.baixo++));
+    result.campos.forEach((f) => (f.confianca >= 0.65 ? c.alto++ : f.confianca >= 0.4 ? c.medio++ : c.baixo++));
     return c;
   }, [result]);
   const [showPdf, setShowPdf] = useState(true);
@@ -346,8 +346,8 @@ function Review({
                 </p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {fields.map((f, i) => {
-                    const low = f.confianca < 0.65;
-                    const mid = !low && f.confianca < 0.85;
+                    const low = f.confianca < 0.4;
+                    const mid = !low && f.confianca < 0.65;
                     return (
                       <motion.div key={f.chave} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className={cn("grid gap-1.5", f.chave === "endereco" && "sm:col-span-2")}>
                         <div className="flex items-center justify-between gap-2">

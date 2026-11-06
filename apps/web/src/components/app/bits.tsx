@@ -108,7 +108,7 @@ export function OrigemTag({ origem }: { origem: LeadOrigem }) {
 
 /** Selo de confiança da leitura do PDF */
 export function ConfidenceSeal({ value }: { value: number }) {
-  const level = value >= 0.85 ? "alto" : value >= 0.65 ? "medio" : "baixo";
+  const level = value >= 0.65 ? "alto" : value >= 0.4 ? "medio" : "baixo";
   const cfg = {
     alto: { label: "Alta", cls: "bg-success-soft text-success border-success/25", bars: 3 },
     medio: { label: "Média", cls: "bg-warning-soft text-warning border-warning/25", bars: 2 },
