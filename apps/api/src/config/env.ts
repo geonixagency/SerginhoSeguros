@@ -40,6 +40,8 @@ const EnvSchema = z.object({
   EVOLUTION_MOCK: bool,
   /** Token exigido no webhook da Evolution (opt-out "SAIR"). */
   EVOLUTION_WEBHOOK_TOKEN: z.string().optional(),
+  // URL que a Evolution chama (rede interna serve: http://<api>:3333/api/webhooks/evolution).
+  EVOLUTION_WEBHOOK_URL: z.string().url().optional(),
   AGGILIZADOR_BASE_URL: z.string().default("https://api.aggilizador.com.br"),
   /** IDs da corretora no Aggilizador (QuotationDto). A credencial cadastrada na tela tem precedência. */
   AGGILIZADOR_INSURANCE_BROKER_ID: z.string().optional(),

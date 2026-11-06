@@ -27,6 +27,8 @@ interface Opts {
   baseUrl: string;
   apiKey: string;
   instance: string;
+  webhookUrl?: string;
+  webhookToken?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -63,8 +65,30 @@ export class EvolutionClient implements EvolutionApi {
     });
   }
 
+  /** Registra o webhook (opt-out "SAIR"). Falha aqui não impede gerar o QR. */
+  private async ensureWebhook() {
+    if (!this.o.webhookUrl || !this.o.webhookToken) return;
+    await this.http
+      .raw({
+        method: "POST",
+        path: `/webhook/set/${this.inst}`,
+        body: {
+          webhook: {
+            enabled: true,
+            url: this.o.webhookUrl,
+            headers: { "x-webhook-token": this.o.webhookToken },
+            byEvents: false,
+            base64: false,
+            events: ["MESSAGES_UPSERT"],
+          },
+        },
+      })
+      .catch(() => undefined);
+  }
+
   async connect() {
     await this.ensureInstance();
+    await this.ensureWebhook();
     const body = await this.http.json<{ base64?: string; code?: string; pairingCode?: string | null; instance?: { state?: string } }>({
       path: `/instance/connect/${this.inst}`,
     });
@@ -162,7 +186,13 @@ export function getEvolution(): EvolutionApi {
   if (instance) return instance;
   if (env.EVOLUTION_MOCK) instance = new MockEvolution();
   else if (env.EVOLUTION_URL && env.EVOLUTION_API_KEY)
-    instance = new EvolutionClient({ baseUrl: env.EVOLUTION_URL, apiKey: env.EVOLUTION_API_KEY, instance: env.EVOLUTION_INSTANCE });
+    instance = new EvolutionClient({
+      baseUrl: env.EVOLUTION_URL,
+      apiKey: env.EVOLUTION_API_KEY,
+      instance: env.EVOLUTION_INSTANCE,
+      webhookUrl: env.EVOLUTION_WEBHOOK_URL,
+      webhookToken: env.EVOLUTION_WEBHOOK_TOKEN,
+    });
   else instance = new UnconfiguredEvolution();
   return instance;
 }
