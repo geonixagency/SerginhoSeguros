@@ -106,7 +106,27 @@ export default async function policyRoutes(app: FastifyInstance) {
       status: input.status,
       endossoDeId: input.endossoDeId,
     };
-    await prisma.policy.update({ where: { id }, data: patch });
+    await prisma.$transaction(async (tx) => {
+      await tx.policy.update({ where: { id }, data: patch });
+      if (input.parcelas) {
+        // Casa pelo número: atualiza as existentes, cria as novas e apaga as que saíram da lista.
+        const seen = new Set<number>();
+        const lista = input.parcelas.filter((p) => (seen.has(p.numero) ? false : (seen.add(p.numero), true)));
+        await tx.installment.deleteMany({ where: { policyId: id, numero: { notIn: lista.map((p) => p.numero) } } });
+        for (const p of lista) {
+          const data = { valor: p.valor ?? null, vencimento: dateOnly(p.vencimento), status: p.status };
+          await tx.installment.upsert({ where: { policyId_numero: { policyId: id, numero: p.numero } }, update: data, create: { ...data, policyId: id, numero: p.numero } });
+        }
+      }
+      if (input.itens) {
+        await tx.insuredItem.deleteMany({ where: { policyId: id } });
+        if (input.itens.length) {
+          await tx.insuredItem.createMany({
+            data: input.itens.map((i) => ({ policyId: id, tipo: i.tipo, placa: i.placa ?? null, modelo: i.modelo ?? null, ano: i.ano ?? null, chassi: i.chassi ?? null, endereco: i.endereco ?? null, descricao: i.descricao ?? null })),
+          });
+        }
+      }
+    });
     await refreshClientStatus(before.clientId);
     await audit(req, "ATUALIZAR", "Policy", id, policyDTO(before), input);
     return policyDetail(id);

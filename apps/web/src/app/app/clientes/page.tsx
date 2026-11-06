@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { ChevronLeft, ChevronRight, FileUp, Search, SlidersHorizontal, Users, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileUp, Search, SlidersHorizontal, UserPlus, Users, X } from "lucide-react";
+import { ClientFormDialog } from "@/components/app/client-forms";
 import { PageHeader } from "@/components/app/shell";
 import { RAMO_ICON } from "@/components/app/bits";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ function ClientsInner() {
   const [seguradora, setSeguradora] = useState("TODAS");
   const [sort, setSort] = useState("nome");
   const [page, setPage] = useState(1);
+  const [novo, setNovo] = useState(false);
   const dq = useDebounced(q);
   const pageSize = 12;
 
@@ -55,13 +57,19 @@ function ClientsInner() {
         title="Clientes"
         description="Busque por nome, CPF, placa ou número da apólice."
         actions={
-          <Button variant="gold" asChild>
-            <Link href="/app/clientes/novo">
-              <FileUp /> Novo por PDF
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setNovo(true)}>
+              <UserPlus /> Novo cliente
+            </Button>
+            <Button variant="gold" asChild>
+              <Link href="/app/clientes/novo">
+                <FileUp /> Novo por PDF
+              </Link>
+            </Button>
+          </div>
         }
       />
+      <ClientFormDialog open={novo} onOpenChange={setNovo} onSaved={(c) => router.push(`/app/clientes/${c.id}?novo=1`)} />
 
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center">

@@ -11,6 +11,7 @@ import type {
   ClientActionDTO,
   ClientActionResultDTO,
   ClientDetailDTO,
+  DocumentDTO,
   ClientListItemDTO,
   DashboardChartsDTO,
   DashboardSummaryDTO,
@@ -71,6 +72,9 @@ import type {
   CreateTemplateInput,
   ProfileUpdate,
   ImportEstado,
+  AttachTipo,
+  ClientInput,
+  PolicyInput,
   InviteInput,
   InviteResult,
   Perfil,
@@ -164,6 +168,38 @@ function policy(p: PolicyDetailDTO | PolicyListItemDTO, client: { id: string; no
   };
 }
 
+/** Formulário manual -> corpo aceito pela API. Campos vazios viram null. */
+function clientBody(d: ClientInput) {
+  const e = d.endereco;
+  const temEndereco = !!e && Object.values(e).some((v) => v && String(v).trim());
+  return {
+    nome: d.nome.trim(),
+    cpfCnpj: d.cpfCnpj,
+    nascimento: d.nascimento || null,
+    cnh: d.cnh?.trim() || null,
+    telefone: d.telefone?.trim() || null,
+    email: d.email?.trim() || null,
+    endereco: temEndereco && e ? { ...e, complemento: e.complemento || null, uf: e.uf?.trim() ? e.uf.trim().toUpperCase() : null } : null,
+    ...(d.optOut !== undefined ? { optOut: d.optOut } : {}),
+  };
+}
+function policyBody(d: PolicyInput) {
+  const it = d.item;
+  return {
+    insurerId: d.insurerId,
+    ramo: RAMO_API[d.ramo],
+    numero: d.numero?.trim() || null,
+    proposta: d.proposta?.trim() || null,
+    inicioVigencia: d.inicioVigencia || null,
+    fimVigencia: d.fimVigencia || null,
+    premioTotal: d.premioTotal,
+    formaPagamento: d.formaPagamento,
+    status: d.status,
+    itens: it && (it.placa || it.modelo) ? [{ tipo: d.ramo === "AUTO" ? "VEICULO" : "OUTRO", placa: it.placa || null, modelo: it.modelo || null, ano: it.ano || null }] : [],
+    parcelas: d.parcelas.map((p) => ({ numero: p.numero, valor: p.valor, vencimento: p.vencimento, status: p.status })),
+  };
+}
+
 function installmentCtx(i: InstallmentWithContextDTO): Installment {
   return {
     id: i.id,
@@ -249,7 +285,7 @@ function clientDetail(c: ClientDetailDTO): ClientDetail {
     apolices,
     parcelas: c.apolices.flatMap((p) => p.parcelas.map((i) => installmentOf(i, p, c))).sort((a, b) => a.vencimento.localeCompare(b.vencimento)),
     documentos: c.documentos.map(
-      (d): DocumentFile => ({ id: d.id, clientId: c.id, policyId: d.policyId, tipo: d.tipo, nome: d.nomeArquivo, tamanho: d.tamanho, criadoEm: d.createdAt }),
+      (d): DocumentFile => ({ id: d.id, clientId: c.id, policyId: d.policyId, tipo: d.tipo, nome: d.nomeArquivo, tamanho: d.tamanho, criadoEm: d.createdAt, mimeType: d.mimeType }),
     ),
   };
 }
@@ -747,6 +783,8 @@ export const realApi = {
       };
     },
     fromPdf,
+    create: async (data: ClientInput): Promise<ClientDetail> => clientDetail(await http.post<ClientDetailDTO>("/clients", { ...clientBody(data), origem: "MANUAL" })),
+    edit: async (id: string, data: ClientInput): Promise<ClientDetail> => clientDetail(await http.patch<ClientDetailDTO>(`/clients/${id}`, clientBody(data))),
   },
   documents: {
     parse: async (file: File): Promise<ParseResult> => {
@@ -757,12 +795,22 @@ export const realApi = {
       return parseResult(dto, file, performance.now() - t0);
     },
     fileUrl: (id: string) => fetchFileUrl(`/documents/${id}/file`, ""),
+    attach: async (clientId: string, files: File[], tipo: AttachTipo, policyId?: string | null): Promise<DocumentFile[]> => {
+      const fd = new FormData();
+      fd.append("tipo", tipo);
+      if (policyId) fd.append("policyId", policyId);
+      for (const f of files) fd.append("arquivos", f, f.name);
+      const docs = await http.post<DocumentDTO[]>(`/clients/${clientId}/documents`, fd);
+      return docs.map((d) => ({ id: d.id, clientId, policyId: d.policyId, tipo: d.tipo, nome: d.nomeArquivo, tamanho: d.tamanho, criadoEm: d.createdAt, mimeType: d.mimeType }));
+    },
   },
   policies: {
     list: async (clientId?: string): Promise<Policy[]> => {
       const r = await http.get<ApiPage<PolicyListItemDTO>>(`/policies${qs({ clientId, pageSize: 200 })}`);
       return r.data.map((p) => policy(p, p.client));
     },
+    create: async (data: PolicyInput): Promise<Policy> => policy(await http.post<PolicyDetailDTO>("/policies", { clientId: data.clientId, ...policyBody(data) }), { id: data.clientId, nome: "" }),
+    update: async (id: string, data: PolicyInput): Promise<Policy> => policy(await http.patch<PolicyDetailDTO>(`/policies/${id}`, policyBody(data)), { id: data.clientId, nome: "" }),
   },
   installments: {
     list: async (status?: string): Promise<Installment[]> =>

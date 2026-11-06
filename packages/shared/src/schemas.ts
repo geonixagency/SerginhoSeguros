@@ -151,7 +151,12 @@ export const PolicyCreateSchema = PolicyFieldsSchema.extend({
 });
 export type PolicyCreateInput = z.infer<typeof PolicyCreateSchema>;
 
-export const PolicyUpdateSchema = PolicyFieldsSchema.partial();
+export const PolicyUpdateSchema = PolicyFieldsSchema.partial().extend({
+  /** Se enviado, substitui a lista de parcelas (casadas pelo número; as que sumirem são apagadas). */
+  parcelas: z.array(InstallmentInputSchema).max(120).optional(),
+  /** Se enviado, substitui os itens segurados. */
+  itens: z.array(InsuredItemInputSchema).max(50).optional(),
+});
 export type PolicyUpdateInput = z.infer<typeof PolicyUpdateSchema>;
 
 export const PolicyListQuerySchema = PaginationQuerySchema.extend({

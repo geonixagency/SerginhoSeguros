@@ -86,6 +86,7 @@ Regras iguais às de `scripts/import`: cliente por CPF/CNPJ (só completa campos
 |---|---|---|
 | POST | `/documents/parse` | Multipart com o campo `file` (PDF de até `MAX_UPLOAD_MB`). Devolve `ParsedPolicyDTO`: campos com `{ valor, confianca }`, `seguradora.insurerId` casado, `clienteExistente` (pelo CPF), `hash` e `documentoExistenteId`. Não grava nada. |
 | POST | `/clients/from-pdf` | Multipart com `file` e `data`, onde `data` é um JSON em string no formato `ClientFromPdfSchema`. Cria ou atualiza o cliente pelo CPF (preenche só campos vazios) e cria apólice, parcelas, itens e documento. Devolve `FromPdfResponse`. |
+| POST | `/clients/:id/documents` | Anexo manual, **sem** leitor de PDF. Multipart: `arquivos` (1 a 10; PDF, JPG, PNG ou WebP conferidos pelo conteúdo, até 25 MB cada), `tipo` (`APOLICE`, `ENDOSSO`, `PROPOSTA`, `BOLETO`, `OUTRO`) e `policyId` opcional (precisa ser do mesmo cliente). Grava em `STORAGE_DIR/_uploads` com hash e tamanho; auditoria `ANEXAR_DOCUMENTO`. Devolve `DocumentDTO[]` (com `mimeType`). |
 | GET | `/documents/:id/file` | Faz o stream do PDF (`application/pdf`, inline); cada download fica na auditoria. Como exige Bearer, use `fetch` e depois `blob` para abrir no visualizador. |
 
 Sugestão para o selo de confiança: verde a partir de 0,85, âmbar entre 0,6 e 0,85 e vermelho abaixo de 0,6.
@@ -94,7 +95,8 @@ Sugestão para o selo de confiança: verde a partir de 0,85, âmbar entre 0,6 e 
 
 `GET /policies?q=&clientId=&insurerId=&ramo=&status=&formaPagamento=&fimDe=&fimAte=` devolve
 `Paginated<PolicyListItemDTO>`. Também existem `GET /policies/:id` (`PolicyDetailDTO`), `POST /policies`
-(`PolicyCreateSchema`, com `parcelas[]` e `itens[]`) e `PATCH /policies/:id`.
+(`PolicyCreateSchema`, com `parcelas[]` e `itens[]`) e `PATCH /policies/:id` (aceita também `parcelas[]`, casadas
+pelo número, com as que saírem da lista apagadas, e `itens[]`, que substituem os atuais).
 `GET /installments?status=&clientId=&policyId=&insurerId=&formaPagamento=&de=&ate=` lista as parcelas, e
 `PATCH /installments/:id` aceita `{ status, valor, vencimento }`.
 O status ATIVO/INATIVO do cliente é recalculado a cada alteração e também em um job diário às 03:00.

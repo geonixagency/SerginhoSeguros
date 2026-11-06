@@ -273,7 +273,43 @@ export interface DocumentFile {
   nome: string;
   tamanho: number;
   criadoEm: ISODate;
+  /** application/pdf ou image/* (anexos manuais). Ausente = PDF. */
+  mimeType?: string;
 }
+
+/** Cadastro/edição manual do cliente. */
+export interface ClientInput {
+  nome: string;
+  cpfCnpj: string;
+  nascimento: ISODate | null;
+  cnh: string | null;
+  telefone: string | null;
+  email: string | null;
+  endereco: Endereco | null;
+  optOut?: boolean;
+}
+export interface InstallmentInput {
+  numero: number;
+  valor: number | null;
+  vencimento: ISODate;
+  status: InstallmentStatus;
+}
+/** Cadastro/edição manual da apólice (sem leitor de PDF). */
+export interface PolicyInput {
+  clientId: string;
+  insurerId: string;
+  ramo: Ramo;
+  numero: string | null;
+  proposta: string | null;
+  inicioVigencia: ISODate | null;
+  fimVigencia: ISODate | null;
+  premioTotal: number | null;
+  formaPagamento: FormaPagamento;
+  status: PolicyStatus;
+  item: { placa: string | null; modelo: string | null; ano: string | null } | null;
+  parcelas: InstallmentInput[];
+}
+export type AttachTipo = "APOLICE" | "ENDOSSO" | "PROPOSTA" | "BOLETO" | "OUTRO";
 
 export type TimelineType = "CADASTRO" | "APOLICE" | "PAGAMENTO" | "MENSAGEM" | "DOCUMENTO" | "ACAO" | "NOTA" | "ALERTA";
 export interface TimelineEvent {

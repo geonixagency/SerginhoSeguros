@@ -23,6 +23,8 @@ export const formatInt = (v: number) => intFmt.format(v);
 /** dd/mm/aaaa no fuso America/Sao_Paulo */
 export function formatDate(iso: string | Date | null | undefined) {
   if (!iso) return "—";
+  // Data pura (aaaa-mm-dd) não tem fuso: formatar direto evita voltar um dia em UTC-3.
+  if (typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso.split("-").reverse().join("/");
   const d = typeof iso === "string" ? new Date(iso) : iso;
   return d.toLocaleDateString("pt-BR", { timeZone: TZ });
 }

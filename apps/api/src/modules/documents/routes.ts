@@ -2,20 +2,35 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
-import { ClientFromPdfSchema, FormaPagamentoSchema, onlyDigits, type FromPdfResponse, type ParsedPolicyDTO } from "@ss/shared";
+import { ClientFromPdfSchema, DocumentTipoSchema, FormaPagamentoSchema, onlyDigits, type FromPdfResponse, type ParsedPolicyDTO } from "@ss/shared";
 import { prisma } from "../../lib/prisma";
 import { parse } from "../../lib/validate";
 import { audit } from "../../lib/audit";
-import { badRequest, notFound } from "../../lib/errors";
+import { AppError, badRequest, notFound } from "../../lib/errors";
 import { sha256 } from "../../lib/crypto";
 import { isPdf, openStorageFile, saveUpload } from "../../lib/storage";
 import { resolveInsurerSlug } from "../../connectors/catalog";
 import { upsertClientByCpf } from "../clients/service";
+import { documentDTO } from "../../lib/serialize";
 import { createPolicyWithChildren } from "../policies/service";
 import { refreshClientStatus } from "../policies/rules";
 import { callPdfParser } from "./pdfParser";
 
 const IdParams = z.object({ id: z.string().min(1) });
+
+export const ANEXO_MAX_MB = 25;
+const ANEXO_MAX_FILES = 10;
+
+/** Tipo real pelo conteúdo (não confia em extensão/MIME declarados). Só PDF e imagens. */
+export function sniffMime(buf: Buffer): { mime: string; ext: string } | null {
+  if (isPdf(buf)) return { mime: "application/pdf", ext: ".pdf" };
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: "image/jpeg", ext: ".jpg" };
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: "image/png", ext: ".png" };
+  if (buf.subarray(0, 4).toString("latin1") === "RIFF" && buf.subarray(8, 12).toString("latin1") === "WEBP") return { mime: "image/webp", ext: ".webp" };
+  return null;
+}
+
+const cleanName = (n: string, fallback: string) => n.replace(/^.*[\\/]/, "").replace(/[\x00-\x1f]/g, "").slice(0, 200) || fallback;
 
 /** Lê o multipart: um arquivo PDF + campos texto opcionais. */
 async function readPdfMultipart(req: FastifyRequest): Promise<{ buf: Buffer; filename: string; fields: Record<string, string> }> {
@@ -118,6 +133,48 @@ export default async function documentRoutes(app: FastifyInstance) {
     await audit(req, "CADASTRO_POR_PDF", "Client", result.clientId, null, { policyId: result.policyId, documentId: result.documentId, clienteCriado: result.clienteCriado });
     reply.status(201);
     return result;
+  });
+
+  /**
+   * Anexa arquivos ao cliente SEM passar pelo leitor de PDF.
+   * Multipart: "arquivos" (1 a 10; PDF, JPG, PNG ou WebP, até 25 MB cada), "tipo" e "policyId" opcionais.
+   */
+  app.post("/clients/:id/documents", async (req, reply) => {
+    const { id } = parse(IdParams, req.params);
+    if (!req.isMultipart()) throw badRequest("Envie os arquivos como multipart/form-data (campo 'arquivos')");
+    const client = await prisma.client.findUnique({ where: { id }, select: { id: true } });
+    if (!client) throw notFound("Cliente");
+    const files: { buf: Buffer; name: string }[] = [];
+    const fields: Record<string, string> = {};
+    for await (const part of req.parts({ limits: { fileSize: ANEXO_MAX_MB * 1024 * 1024, files: ANEXO_MAX_FILES, fields: 5 } })) {
+      if (part.type === "file") {
+        const buf = await part.toBuffer();
+        if (part.file.truncated) throw new AppError(413, "FILE_TOO_LARGE", `"${cleanName(part.filename, "arquivo")}" passa de ${ANEXO_MAX_MB} MB`);
+        files.push({ buf, name: cleanName(part.filename, "arquivo") });
+      } else if (typeof part.value === "string") fields[part.fieldname] = part.value;
+    }
+    if (!files.length) throw badRequest("Nenhum arquivo enviado (campo 'arquivos')");
+    const tipo = parse(DocumentTipoSchema.default("OUTRO"), fields.tipo || undefined);
+    const policyId = fields.policyId || null;
+    if (policyId) {
+      const pol = await prisma.policy.findFirst({ where: { id: policyId, clientId: id }, select: { id: true } });
+      if (!pol) throw badRequest("Apólice não pertence a este cliente");
+    }
+    const tipos = files.map((f) => sniffMime(f.buf));
+    const ruim = files.find((_, i) => !tipos[i]);
+    if (ruim) throw badRequest(`"${ruim.name}" não é PDF nem imagem (JPG, PNG, WebP)`);
+
+    const docs = [];
+    for (const [i, f] of files.entries()) {
+      const t = tipos[i]!;
+      const saved = await saveUpload(f.buf, t.ext);
+      const doc = await prisma.document.create({
+        data: { clientId: id, policyId, tipo, nomeArquivo: f.name, caminho: saved.caminho, hash: saved.hash, tamanho: saved.tamanho, mimeType: t.mime },
+      });
+      docs.push(doc);
+    }
+    await audit(req, "ANEXAR_DOCUMENTO", "Client", id, null, { documentos: docs.map((d) => ({ id: d.id, tipo: d.tipo, nome: d.nomeArquivo, tamanho: d.tamanho })), policyId });
+    return reply.status(201).send(docs.map(documentDTO));
   });
 
   // Stream autenticado do PDF. Todo download fica na auditoria (LGPD).

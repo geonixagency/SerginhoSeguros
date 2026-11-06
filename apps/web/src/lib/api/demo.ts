@@ -4,6 +4,10 @@
  */
 import { buildDemoDB, type DemoDB } from "./demo-data";
 import type {
+  ClientInput,
+  DocumentFile,
+  Policy,
+  PolicyInput,
   ActionResult,
   Birthday,
   BroadcastFilter,
@@ -28,6 +32,7 @@ import type {
   Ramo,
 } from "../types";
 import { daysUntil, renderTemplate, formatBRL, formatDate } from "../utils";
+import { isValidCpfCnpj } from "@ss/shared";
 
 let db: DemoDB | null = null;
 const getDB = () => (db ??= buildDemoDB());
@@ -294,8 +299,8 @@ route("GET", "/clients", ({ d, query }): Paginated<ClientListItem> => {
   );
   return { items: items.slice((page - 1) * pageSize, page * pageSize), total: items.length, page, pageSize };
 });
-route("GET", "/clients/:id", ({ d, params }): ClientDetail => {
-  const c = d.clients.find((x) => x.id === params.id);
+function detailOf(d: DemoDB, id: string): ClientDetail {
+  const c = d.clients.find((x) => x.id === id);
   if (!c) throw new DemoHttpError(404, "Cliente não encontrado.");
   return {
     ...toListItem(d, c),
@@ -303,12 +308,51 @@ route("GET", "/clients/:id", ({ d, params }): ClientDetail => {
     parcelas: d.installments.filter((i) => i.clientId === c.id).sort((a, b) => b.vencimento.localeCompare(a.vencimento)),
     documentos: d.documents.filter((x) => x.clientId === c.id),
   };
+}
+/** Status do cliente: ATIVO se houver apólice vigente com fim >= hoje. */
+function recalcStatus(d: DemoDB, clientId: string) {
+  const c = d.clients.find((x) => x.id === clientId);
+  if (!c) return;
+  const hoje = new Date().toISOString().slice(0, 10);
+  c.status = d.policies.some((p) => p.clientId === clientId && p.status === "VIGENTE" && (p.fimVigencia || "") >= hoje) ? "ATIVO" : "INATIVO";
+}
+function checkClientInput(d: DemoDB, b: ClientInput, selfId?: string) {
+  if (!b.nome || b.nome.trim().length < 2) throw new DemoHttpError(400, "Informe o nome");
+  const doc = (b.cpfCnpj ?? "").replace(/\D/g, "");
+  if (!isValidCpfCnpj(doc)) throw new DemoHttpError(400, "CPF/CNPJ inválido");
+  if (d.clients.some((x) => x.cpfCnpj === doc && x.id !== selfId)) throw new DemoHttpError(409, "Já existe cliente com este CPF/CNPJ");
+  return doc;
+}
+route("GET", "/clients/:id", ({ d, params }): ClientDetail => detailOf(d, params.id));
+route("POST", "/clients", ({ d, body }): ClientDetail => {
+  const b = body as ClientInput;
+  const doc = checkClientInput(d, b);
+  const id = `cli-man-${Date.now()}`;
+  d.clients.unshift({ id, nome: b.nome.trim(), cpfCnpj: doc, nascimento: b.nascimento, cnh: b.cnh, telefone: (b.telefone ?? "").replace(/\D/g, ""), email: b.email, endereco: b.endereco, status: "INATIVO", origem: "MANUAL", optOut: false, criadoEm: now() });
+  d.timeline[id] = [{ id: `tl-${id}`, tipo: "CADASTRO", titulo: "Cliente cadastrado manualmente", data: now() }];
+  return detailOf(d, id);
 });
-route("PATCH", "/clients/:id", ({ d, params, body }) => {
+route("PATCH", "/clients/:id", ({ d, params, body }): ClientDetail => {
   const c = d.clients.find((x) => x.id === params.id);
   if (!c) throw new DemoHttpError(404, "Cliente não encontrado.");
-  Object.assign(c, body as object);
-  return c;
+  const b = body as Partial<ClientInput>;
+  if (b.cpfCnpj !== undefined) b.cpfCnpj = checkClientInput(d, { ...c, ...b } as ClientInput, c.id);
+  if (b.telefone !== undefined) b.telefone = (b.telefone ?? "").replace(/\D/g, "");
+  Object.assign(c, b);
+  return detailOf(d, c.id);
+});
+route("POST", "/clients/:id/documents", ({ d, params, body }): DocumentFile[] => {
+  if (!d.clients.some((x) => x.id === params.id)) throw new DemoHttpError(404, "Cliente não encontrado.");
+  const fd = body instanceof FormData ? body : null;
+  const files = (fd?.getAll("arquivos") ?? []).filter((f): f is File => typeof f !== "string");
+  if (!files.length) throw new DemoHttpError(400, "Nenhum arquivo enviado");
+  const ruim = files.find((f) => !/\.(pdf|jpe?g|png|webp)$/i.test(f.name));
+  if (ruim) throw new DemoHttpError(400, `"${ruim.name}" não é PDF nem imagem (JPG, PNG, WebP)`);
+  const tipo = (fd?.get("tipo") as DocumentFile["tipo"]) || "OUTRO";
+  const policyId = (fd?.get("policyId") as string) || null;
+  const docs = files.map((f, i): DocumentFile => ({ id: `doc-man-${Date.now()}-${i}`, clientId: params.id, policyId, tipo, nome: f.name, tamanho: f.size, criadoEm: now(), mimeType: f.type || "application/pdf" }));
+  d.documents.unshift(...docs);
+  return docs;
 });
 route("GET", "/clients/:id/timeline", ({ d, params }) => d.timeline[params.id] ?? []);
 route("GET", "/messaging/history/client/:id", ({ d, params }) => d.messages.filter((m) => m.clientId === params.id));
@@ -431,6 +475,44 @@ route("POST", "/clients/from-pdf", ({ d, body }) => {
 route("GET", "/policies", ({ d, query }) => {
   const clientId = query.get("clientId");
   return d.policies.filter((p) => !clientId || p.clientId === clientId);
+});
+function savePolicy(d: DemoDB, b: PolicyInput, id: string): Policy {
+  const c = d.clients.find((x) => x.id === b.clientId);
+  const ins = d.insurers.find((x) => x.id === b.insurerId);
+  if (!c) throw new DemoHttpError(404, "Cliente não encontrado.");
+  if (!ins) throw new DemoHttpError(400, "Seguradora inválida");
+  const old = d.policies.find((p) => p.id === id);
+  const p: Policy = {
+    id,
+    clientId: c.id,
+    clientNome: c.nome,
+    insurerId: ins.id,
+    seguradora: ins.nome,
+    ramo: b.ramo,
+    numero: b.numero || "—",
+    proposta: b.proposta ?? "",
+    emissao: old?.emissao ?? b.inicioVigencia ?? now(),
+    inicioVigencia: b.inicioVigencia ?? "",
+    fimVigencia: b.fimVigencia ?? "",
+    premioTotal: b.premioTotal ?? 0,
+    formaPagamento: b.formaPagamento,
+    status: b.status,
+    item: b.item && (b.item.placa || b.item.modelo) ? { tipo: b.ramo === "AUTO" ? "VEICULO" : "EMPRESA", descricao: b.item.modelo ?? b.item.placa ?? "", placa: b.item.placa ?? undefined, modelo: b.item.modelo ?? undefined, ano: b.item.ano ? Number(b.item.ano) || undefined : undefined } : null,
+    documentId: old?.documentId ?? null,
+  };
+  if (old) Object.assign(old, p);
+  else d.policies.unshift(p);
+  d.installments = d.installments.filter((i) => i.policyId !== id);
+  d.installments.push(
+    ...b.parcelas.map((x) => ({ id: `${id}-p${x.numero}`, policyId: id, apoliceNumero: p.numero, clientId: c.id, clientNome: c.nome, telefone: c.telefone, seguradora: ins.nome, numero: x.numero, total: b.parcelas.length, valor: x.valor ?? 0, vencimento: x.vencimento, status: x.status, formaPagamento: b.formaPagamento })),
+  );
+  recalcStatus(d, c.id);
+  return p;
+}
+route("POST", "/policies", ({ d, body }) => savePolicy(d, body as PolicyInput, `pol-man-${Date.now()}`));
+route("PATCH", "/policies/:id", ({ d, params, body }) => {
+  if (!d.policies.some((p) => p.id === params.id)) throw new DemoHttpError(404, "Apólice não encontrada");
+  return savePolicy(d, body as PolicyInput, params.id);
 });
 route("GET", "/installments", ({ d, query }): Installment[] => {
   const status = query.get("status");

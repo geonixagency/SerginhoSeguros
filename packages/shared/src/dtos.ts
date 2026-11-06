@@ -102,6 +102,8 @@ export interface DocumentDTO {
   tipo: DocumentTipo;
   nomeArquivo: string;
   tamanho: number;
+  /** application/pdf, image/jpeg, image/png ou image/webp. */
+  mimeType?: string;
   policyId: string | null;
   createdAt: string;
   /** URL relativa para baixar (GET autenticado). */

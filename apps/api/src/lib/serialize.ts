@@ -71,6 +71,7 @@ export const documentDTO = (d: Document): DocumentDTO => ({
   tipo: d.tipo,
   nomeArquivo: d.nomeArquivo,
   tamanho: d.tamanho,
+  mimeType: d.mimeType,
   policyId: d.policyId,
   createdAt: d.createdAt.toISOString(),
   url: `/api/documents/${d.id}/file`,

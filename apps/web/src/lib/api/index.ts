@@ -27,6 +27,10 @@ import type {
   CreateTemplateInput,
   ProfileUpdate,
   ImportEstado,
+  AttachTipo,
+  ClientInput,
+  DocumentFile,
+  PolicyInput,
   InviteInput,
   InviteResult,
   Perfil,
@@ -107,12 +111,26 @@ const demoApi = {
     actions: (id: string) => http.get<ClientAction[]>(`/clients/${id}/actions`),
     runAction: (id: string, acao: ActionId, policyId: string) => http.post<ActionResult>(`/clients/${id}/actions/${acao}`, { policyId }),
     fromPdf: (input: CreateFromPdfInput) => http.post<{ clientId: string; criado: boolean }>("/clients/from-pdf", input),
+    create: (data: ClientInput) => http.post<ClientDetail>("/clients", data),
+    edit: (id: string, data: ClientInput) => http.patch<ClientDetail>(`/clients/${id}`, data),
   },
   documents: {
     parse: (file: File) => http.post<ParseResult>("/documents/parse", { fileName: file.name }),
     fileUrl: (id: string) => fetchFileUrl(`/documents/${id}/file`, "/demo/apolice-demo.pdf"),
+    /** Anexa arquivos ao cliente sem o leitor de PDF. */
+    attach: (clientId: string, files: File[], tipo: AttachTipo, policyId?: string | null) => {
+      const fd = new FormData();
+      fd.append("tipo", tipo);
+      if (policyId) fd.append("policyId", policyId);
+      for (const f of files) fd.append("arquivos", f, f.name);
+      return http.post<DocumentFile[]>(`/clients/${clientId}/documents`, fd);
+    },
   },
-  policies: { list: (clientId?: string) => http.get<Policy[]>(`/policies${qs({ clientId })}`) },
+  policies: {
+    list: (clientId?: string) => http.get<Policy[]>(`/policies${qs({ clientId })}`),
+    create: (data: PolicyInput) => http.post<Policy>("/policies", data),
+    update: (id: string, data: PolicyInput) => http.patch<Policy>(`/policies/${id}`, data),
+  },
   installments: { list: (status?: string) => http.get<Installment[]>(`/installments${qs({ status })}`) },
   insurers: {
     list: () => http.get<Insurer[]>("/insurers"),

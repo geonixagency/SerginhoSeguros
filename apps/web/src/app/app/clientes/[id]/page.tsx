@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { use, useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import {
   ArrowLeft,
   BellOff,
+  Paperclip,
+  Pencil,
+  Plus,
   CalendarDays,
   Car,
   FileText,
@@ -26,13 +30,14 @@ import {
 } from "lucide-react";
 import { InstallmentStatusBadge, MessageStatusBadge, PolicyStatusBadge, RamoTag } from "@/components/app/bits";
 import { PdfViewer } from "@/components/app/pdf-viewer";
+import { AttachDialog, ClientFormDialog, PolicyFormDialog } from "@/components/app/client-forms";
 import { SendWhatsAppDialog } from "@/components/app/send-whatsapp";
 import { Button } from "@/components/ui/button";
 import { Avatar, Badge, Card, EmptyState, ErrorState, Skeleton } from "@/components/ui/primitives";
 import { Tabs, TabsContent } from "@/components/ui/overlays";
 import { WhatsAppIcon } from "@/components/site/whatsapp-icon";
 import { api } from "@/lib/api";
-import type { ClientDetail, DocumentFile, TimelineType } from "@/lib/types";
+import type { ClientDetail, DocumentFile, Policy, TimelineType } from "@/lib/types";
 import { FORMA_PAGAMENTO_LABEL } from "@/lib/types";
 import { cn, daysUntil, firstName, formatBRL, formatCpfCnpj, formatDate, formatDateTime, formatPhone, formatRelative } from "@/lib/utils";
 
@@ -76,9 +81,27 @@ function DadosTab({ c }: { c: ClientDetail }) {
   );
 }
 
-function ApolicesTab({ c }: { c: ClientDetail }) {
-  if (!c.apolices.length) return <EmptyState icon={<ShieldCheck />} title="Sem apólices" description="Cadastre a partir do PDF da apólice." />;
+function ApolicesTab({ c, onNew, onEdit }: { c: ClientDetail; onNew: () => void; onEdit: (p: Policy) => void }) {
+  if (!c.apolices.length)
+    return (
+      <EmptyState
+        icon={<ShieldCheck />}
+        title="Sem apólices"
+        description="Lance a apólice manualmente ou cadastre a partir do PDF."
+        action={
+          <Button variant="gold" onClick={onNew}>
+            <Plus /> Nova apólice
+          </Button>
+        }
+      />
+    );
   return (
+    <div className="grid gap-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={onNew}>
+          <Plus /> Nova apólice
+        </Button>
+      </div>
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {c.apolices.map((p, i) => {
         const d = daysUntil(p.fimVigencia);
@@ -93,7 +116,12 @@ function ApolicesTab({ c }: { c: ClientDetail }) {
                   <p className="mt-1 font-display text-2xl font-semibold">{p.seguradora}</p>
                   <p className="font-mono text-xs text-muted">Apólice {p.numero} · proposta {p.proposta}</p>
                 </div>
-                <PolicyStatusBadge status={p.status} />
+                <div className="flex items-center gap-1">
+                  <PolicyStatusBadge status={p.status} />
+                  <Button variant="ghost" size="icon-sm" onClick={() => onEdit(p)} aria-label={`Editar apólice ${p.numero}`}>
+                    <Pencil />
+                  </Button>
+                </div>
               </div>
               {p.item && (
                 <div className="mt-4 flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2.5 text-sm">
@@ -131,6 +159,7 @@ function ApolicesTab({ c }: { c: ClientDetail }) {
           </motion.div>
         );
       })}
+    </div>
     </div>
   );
 }
@@ -176,13 +205,32 @@ function ParcelasTab({ c }: { c: ClientDetail }) {
   );
 }
 
-function DocumentosTab({ c }: { c: ClientDetail }) {
-  const [sel, setSel] = useState<DocumentFile | null>(c.documentos[0] ?? null);
+function DocumentosTab({ c, onAttach }: { c: ClientDetail; onAttach: () => void }) {
+  const [selId, setSelId] = useState<string | null>(c.documentos[0]?.id ?? null);
+  const sel = c.documentos.find((d) => d.id === selId) ?? c.documentos[0] ?? null;
+  const setSel = (d: DocumentFile) => setSelId(d.id);
   const load = useCallback(() => api.documents.fileUrl(sel?.id ?? ""), [sel?.id]);
-  if (!c.documentos.length) return <EmptyState icon={<FileText />} title="Nenhum documento" description="Os PDFs de apólices e boletos aparecem aqui." />;
+  if (!c.documentos.length)
+    return (
+      <EmptyState
+        icon={<FileText />}
+        title="Nenhum documento"
+        description="Anexe PDFs de apólices, boletos ou fotos de documentos."
+        action={
+          <Button variant="gold" onClick={onAttach}>
+            <Paperclip /> Anexar arquivos
+          </Button>
+        }
+      />
+    );
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
       <ul className="grid content-start gap-2" aria-label="Documentos">
+        <li>
+          <Button variant="outline" className="w-full" onClick={onAttach}>
+            <Paperclip /> Anexar arquivos
+          </Button>
+        </li>
         {c.documentos.map((d) => (
           <li key={d.id}>
             <button
@@ -190,7 +238,9 @@ function DocumentosTab({ c }: { c: ClientDetail }) {
               aria-pressed={sel?.id === d.id}
               className={cn("flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors", sel?.id === d.id ? "border-gold-500/60 bg-accent-soft" : "border-border bg-surface hover:border-border-strong")}
             >
-              <span className="grid h-11 w-9 shrink-0 place-items-center rounded-md border border-border bg-surface text-[9px] font-extrabold text-danger shadow-sm">PDF</span>
+              <span className={cn("grid h-11 w-9 shrink-0 place-items-center rounded-md border border-border bg-surface text-[9px] font-extrabold shadow-sm", d.mimeType?.startsWith("image/") ? "text-info" : "text-danger")}>
+                {d.mimeType?.startsWith("image/") ? "IMG" : "PDF"}
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{d.nome}</span>
                 <span className="block text-xs text-muted">
@@ -202,7 +252,7 @@ function DocumentosTab({ c }: { c: ClientDetail }) {
         ))}
         <p className="px-1 pt-2 text-xs text-subtle">Cada abertura de documento é registrada na auditoria (LGPD).</p>
       </ul>
-      {sel && <PdfViewer key={sel.id} load={load} nome={sel.nome} />}
+      {sel && <PdfViewer key={sel.id} load={load} nome={sel.nome} image={sel.mimeType?.startsWith("image/")} />}
     </div>
   );
 }
@@ -276,9 +326,30 @@ function TimelineTab({ id }: { id: string }) {
 }
 
 export default function ClientPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <ClientPageInner params={params} />
+    </Suspense>
+  );
+}
+
+function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const search = useSearchParams();
   const [tab, setTab] = useState("dados");
   const [wa, setWa] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [attach, setAttach] = useState(false);
+  /** undefined = fechado; null = nova apólice; Policy = editar. */
+  const [polForm, setPolForm] = useState<Policy | null | undefined>(undefined);
+  // Cadastro manual recém-criado: já abre a primeira apólice.
+  useEffect(() => {
+    if (search.get("novo") === "1") {
+      setTab("apolices");
+      setPolForm(null);
+      window.history.replaceState(null, "", `/app/clientes/${id}`);
+    }
+  }, [search, id]);
   const { data: c, isLoading, isError, error, refetch } = useQuery({ queryKey: ["client", id], queryFn: () => api.clients.get(id) });
 
   const stats = useMemo(() => {
@@ -322,6 +393,9 @@ export default function ClientPage({ params }: { params: Promise<{ id: string }>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button className="border border-white/15 bg-white/5 text-ivory-50 shadow-none hover:bg-white/10" onClick={() => setEditing(true)}>
+              <Pencil /> Editar
+            </Button>
             <Button variant="gold" onClick={() => setWa(true)} disabled={c.optOut}>
               <WhatsAppIcon className="size-4" /> Mensagem
             </Button>
@@ -365,13 +439,13 @@ export default function ClientPage({ params }: { params: Promise<{ id: string }>
             <DadosTab c={c} />
           </TabsContent>
           <TabsContent value="apolices">
-            <ApolicesTab c={c} />
+            <ApolicesTab c={c} onNew={() => setPolForm(null)} onEdit={(p) => setPolForm(p)} />
           </TabsContent>
           <TabsContent value="parcelas">
             <ParcelasTab c={c} />
           </TabsContent>
           <TabsContent value="documentos">
-            <DocumentosTab c={c} />
+            <DocumentosTab c={c} onAttach={() => setAttach(true)} />
           </TabsContent>
           <TabsContent value="mensagens">
             <MensagensTab c={c} />
@@ -381,6 +455,10 @@ export default function ClientPage({ params }: { params: Promise<{ id: string }>
           </TabsContent>
         </div>
       </Tabs>
+
+      <ClientFormDialog open={editing} onOpenChange={setEditing} client={c} />
+      <PolicyFormDialog key={polForm === undefined ? "closed" : (polForm?.id ?? "nova")} open={polForm !== undefined} onOpenChange={(o) => !o && setPolForm(undefined)} client={c} policy={polForm} />
+      <AttachDialog key={attach ? "open" : "closed"} open={attach} onOpenChange={setAttach} client={c} />
 
       <SendWhatsAppDialog
         open={wa}

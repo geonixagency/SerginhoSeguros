@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/primitives";
 
 /** Visualizador de PDF embutido (usa o leitor nativo do navegador). */
-export function PdfViewer({ load, nome, className }: { load: () => Promise<string>; nome: string; className?: string }) {
+export function PdfViewer({ load, nome, className, image }: { load: () => Promise<string>; nome: string; className?: string; image?: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +43,7 @@ export function PdfViewer({ load, nome, className }: { load: () => Promise<strin
               </a>
             </Button>
             <Button variant="ghost" size="icon-sm" asChild>
-              <a href={url} download={nome} aria-label="Baixar PDF">
+              <a href={url} download={nome} aria-label="Baixar arquivo">
                 <Download />
               </a>
             </Button>
@@ -59,6 +59,9 @@ export function PdfViewer({ load, nome, className }: { load: () => Promise<strin
               <Loader2 className="size-4 animate-spin" /> Abrindo documento…
             </span>
           </div>
+        ) : image ? (
+          // eslint-disable-next-line @next/next/no-img-element -- arquivo autenticado servido como blob
+          <img src={url} alt={nome} className="size-full object-contain" />
         ) : (
           <iframe src={`${url}#toolbar=1&navpanes=0&view=FitH`} title={`Visualização de ${nome}`} className="size-full" />
         )}
