@@ -18,11 +18,9 @@ RUN pnpm --filter @ss/portal-robot build
 
 FROM mcr.microsoft.com/playwright:v1.56.1-noble AS runtime
 ENV NODE_ENV=production
-WORKDIR /app
-# Só o necessário para rodar: bundle + node_modules de produção do serviço.
-COPY --from=build /repo/services/portal-robot/dist ./dist
-COPY --from=build /repo/services/portal-robot/node_modules ./node_modules
-COPY --from=build /repo/services/portal-robot/package.json ./package.json
+# node_modules do pnpm são links para /repo/node_modules/.pnpm: copiamos o workspace inteiro.
+COPY --from=build /repo /repo
+WORKDIR /repo/services/portal-robot
 RUN mkdir -p /profiles && chown -R pwuser /profiles
 USER pwuser
 EXPOSE 8020
