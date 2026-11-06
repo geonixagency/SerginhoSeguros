@@ -24,6 +24,8 @@ export interface UserDTO {
   email: string;
   perfil: Perfil;
   ativo: boolean;
+  /** Data URL da foto de perfil (null = sem foto). */
+  avatar?: string | null;
 }
 
 export interface LoginResponse {

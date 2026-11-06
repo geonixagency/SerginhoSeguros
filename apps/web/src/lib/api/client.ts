@@ -74,7 +74,9 @@ async function request<T>(method: Method, path: string, body?: unknown, retry = 
   } catch {
     throw new ApiError(0, "Não foi possível falar com o servidor. Verifique sua conexão.");
   }
-  if (res.status === 401 && retry && !path.startsWith("/auth/") && !path.startsWith("/public/")) {
+  // Login/refresh/senha não renovam sessão; /auth/me (perfil) renova como as demais rotas.
+  const semRefresh = /^\/auth\/(login|refresh|logout|forgot-password|reset-password)(?:$|[/?])/.test(path) || path.startsWith("/public/");
+  if (res.status === 401 && retry && !semRefresh) {
     if (await tryRefresh()) return request<T>(method, path, body, false);
     onUnauthorized?.();
   }

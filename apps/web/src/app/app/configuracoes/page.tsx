@@ -1,17 +1,70 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Building, Download, Monitor, Moon, Palette, ShieldCheck, Sun, UserCog, Users } from "lucide-react";
 import { PageHeader } from "@/components/app/shell";
+import { ImportCarteira } from "@/components/app/import-carteira";
+import { ProfileCard } from "@/components/app/profile-card";
+import { Tabs, TabsContent } from "@/components/ui/overlays";
 import { Button } from "@/components/ui/button";
 import { Avatar, Badge, Card, CardHeader, Field, Input } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/auth";
 import { IS_DEMO, API_BASE as API_BASE_LABEL } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
+const ABAS = ["geral", "perfil", "importar"] as const;
+type Aba = (typeof ABAS)[number];
+
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <Settings />
+    </Suspense>
+  );
+}
+
+function Settings() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const params = useSearchParams();
+  const isAdmin = user?.perfil === "ADMIN";
+  const pedida = params.get("aba") as Aba | null;
+  const aba: Aba = pedida && ABAS.includes(pedida) && (pedida !== "importar" || isAdmin) ? pedida : "geral";
+  const setAba = (v: string) => router.replace(v === "geral" ? "/app/configuracoes" : `/app/configuracoes?aba=${v}`, { scroll: false });
+
+  return (
+    <>
+      <PageHeader eyebrow="Sistema" title="Configurações" description="Seu perfil, corretora, equipe, aparência e privacidade." />
+      <Tabs
+        value={aba}
+        onValueChange={setAba}
+        layoutId="config-tabs"
+        items={[
+          { value: "geral", label: "Geral" },
+          { value: "perfil", label: "Meu perfil" },
+          ...(isAdmin ? [{ value: "importar", label: "Importar carteira" }] : []),
+        ]}
+      >
+        <TabsContent value="geral" className="pt-5 outline-none">
+          <Geral />
+        </TabsContent>
+        <TabsContent value="perfil" className="pt-5 outline-none">
+          <ProfileCard />
+        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="importar" className="pt-5 outline-none">
+            <ImportCarteira />
+          </TabsContent>
+        )}
+      </Tabs>
+    </>
+  );
+}
+
+function Geral() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -19,7 +72,6 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Sistema" title="Configurações" description="Corretora, equipe, aparência e privacidade." />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader icon={<Building />} title="Corretora" description="Aparece nas mensagens e no site." />

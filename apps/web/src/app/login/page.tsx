@@ -59,9 +59,9 @@ function LoginForm() {
       <div className="grid gap-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="senha">Senha</Label>
-          <button type="button" className="text-xs font-semibold text-accent-text hover:underline" onClick={() => setError("Peça a redefinição ao administrador da corretora.")}>
-            Esqueci a senha
-          </button>
+          <Link href="/redefinir-senha" className="text-xs font-semibold text-accent-text hover:underline">
+            Esqueci minha senha
+          </Link>
         </div>
         <div className="relative">
           <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />

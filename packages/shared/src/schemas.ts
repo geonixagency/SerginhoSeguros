@@ -25,6 +25,27 @@ export const LoginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof LoginSchema>;
 
+/** Foto de perfil: data URL de imagem já reduzida no navegador (~256 px). */
+export const AVATAR_MAX_CHARS = 300_000;
+export const ProfileUpdateSchema = z
+  .object({
+    nome: z.string().trim().min(2, "Informe seu nome").max(120).optional(),
+    avatar: z
+      .string()
+      .max(AVATAR_MAX_CHARS, "Foto grande demais")
+      .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/, "Formato de imagem inválido")
+      .nullable()
+      .optional(),
+  })
+  .refine((v) => v.nome !== undefined || v.avatar !== undefined, { message: "Nada para atualizar" });
+export type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
+
+export const ForgotPasswordSchema = z.object({ email: z.string().trim().toLowerCase().email("E-mail inválido") });
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(20).max(200),
+  senha: z.string().min(10, "A senha deve ter ao menos 10 caracteres").max(200),
+});
+
 export const UserCreateSchema = z.object({
   nome: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().email(),

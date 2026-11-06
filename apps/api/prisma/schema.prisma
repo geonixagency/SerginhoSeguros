@@ -104,20 +104,37 @@ enum TaskStatus {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  nome          String
-  email         String         @unique
-  senhaHash     String         @map("senha_hash")
-  perfil        Perfil         @default(OPERADOR)
-  ativo         Boolean        @default(true)
-  ultimoLogin   DateTime?      @map("ultimo_login")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  refreshTokens RefreshToken[]
-  leads         Lead[]
-  auditLogs     AuditLog[]
+  id             String               @id @default(cuid())
+  nome           String
+  email          String               @unique
+  senhaHash      String               @map("senha_hash")
+  perfil         Perfil               @default(OPERADOR)
+  ativo          Boolean              @default(true)
+  ultimoLogin    DateTime?            @map("ultimo_login")
+  /// Foto de perfil já recortada no navegador (data URL JPEG/WebP, ~256 px, até ~200 KB).
+  avatar         String?              @db.Text
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordResetToken[]
+  leads          Lead[]
+  auditLogs      AuditLog[]
 
   @@map("users")
+}
+
+/// Link de redefinição de senha: guardamos só o hash do token; uso único, expira em 1 h.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 /// Refresh tokens com rotação: guardamos só o hash; reuso de token revogado derruba a família.
@@ -167,20 +184,20 @@ model Client {
 }
 
 model Insurer {
-  id               String              @id @default(cuid())
-  nome             String              @unique
-  slug             String              @unique
-  categoria        InsurerCategoria    @default(SEGURADORA)
+  id               String             @id @default(cuid())
+  nome             String             @unique
+  slug             String             @unique
+  categoria        InsurerCategoria   @default(SEGURADORA)
   ramos            String[]
-  portalUrl        String?             @map("portal_url")
-  temApi           Boolean             @default(false) @map("tem_api")
-  statusIntegracao StatusIntegracao    @default(SEM_API) @map("status_integracao")
+  portalUrl        String?            @map("portal_url")
+  temApi           Boolean            @default(false) @map("tem_api")
+  statusIntegracao StatusIntegracao   @default(SEM_API) @map("status_integracao")
   /// Capacidades declaradas (cache do conector + notas da pesquisa de APIs).
-  capacidades      Json                @default("[]")
+  capacidades      Json               @default("[]")
   observacoes      String?
-  ativo            Boolean             @default(true)
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt @map("updated_at")
+  ativo            Boolean            @default(true)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
   credential       InsurerCredential?
   policies         Policy[]
   tasks            Task[]

@@ -53,6 +53,16 @@ const EnvSchema = z.object({
   PORTAL_ROBOT_URL: z.string().default("http://portal-robot:8020"),
   /** Token compartilhado com o portal-robot (mesmo valor de ROBOT_TOKEN lá). */
   PORTAL_ROBOT_TOKEN: z.string().optional(),
+  /** URL pública do frontend, usada nos links enviados por e-mail (redefinição de senha). */
+  WEB_URL: z.string().url().default("http://localhost:3000"),
+  /** SMTP para e-mails transacionais. Sem SMTP_HOST/SMTP_FROM a redefinição por e-mail fica indisponível. */
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().default(587),
+  /** true = TLS direto (porta 465); false = STARTTLS quando o servidor oferece. */
+  SMTP_SECURE: bool,
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
   /** false = este processo não roda worker/agendador (útil para escalar só a API). */
   RUN_WORKER: z
     .string()

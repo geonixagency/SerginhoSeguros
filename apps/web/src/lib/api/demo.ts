@@ -21,6 +21,7 @@ import type {
   Lead,
   MessageRule,
   MessageTemplate,
+  User,
   Paginated,
   ParseResult,
   Quote,
@@ -69,7 +70,7 @@ function route(method: string, path: string, handler: Handler) {
 }
 
 /* ---------------- auth ---------------- */
-const DEMO_USER = { id: "usr-1", nome: "Viviani Rosalim", email: "viviani@serginhoseguros.com.br", perfil: "ADMIN" as const };
+const DEMO_USER: User = { id: "usr-1", nome: "Viviani Rosalim", email: "viviani@serginhoseguros.com.br", perfil: "ADMIN", avatar: null };
 route("POST", "/auth/login", ({ body }) => {
   const b = body as { email?: string; senha?: string };
   if (!b?.email || !b?.senha) throw new DemoHttpError(400, "Informe e-mail e senha.");
@@ -80,6 +81,61 @@ route("POST", "/auth/login", ({ body }) => {
 route("POST", "/auth/refresh", () => ({ accessToken: "demo-token", user: DEMO_USER }));
 route("POST", "/auth/logout", () => ({ ok: true }));
 route("GET", "/auth/me", () => DEMO_USER);
+route("PATCH", "/auth/me", ({ body }) => {
+  const b = body as { nome?: string; avatar?: string | null };
+  if (b.nome !== undefined) {
+    if (b.nome.trim().length < 2) throw new DemoHttpError(400, "Informe seu nome");
+    DEMO_USER.nome = b.nome.trim();
+  }
+  if (b.avatar !== undefined) DEMO_USER.avatar = b.avatar;
+  return { ...DEMO_USER };
+});
+route("POST", "/auth/forgot-password", () => ({ ok: true }));
+route("POST", "/auth/reset-password", ({ body }) => {
+  const b = body as { token?: string; senha?: string };
+  if (!b.token || b.token.length < 20) throw new DemoHttpError(400, "Link inválido ou expirado. Peça um novo link de redefinição.");
+  if (!b.senha || b.senha.length < 10) throw new DemoHttpError(400, "A senha deve ter ao menos 10 caracteres");
+  return { ok: true };
+});
+
+/* Importação da carteira: no demo só simula (nada é gravado). */
+const demoJobs = new Map<string, { inicio: number; total: number; dryRun: boolean }>();
+route("GET", "/import/estado", ({ d }) => ({ clientes: d.clients.length, apolices: d.policies.length, documentos: d.documents.length, indicePdfs: 0, importacaoEmAndamento: null }));
+route("POST", "/import/pdfs", ({ body }) => {
+  const files = body instanceof FormData ? body.getAll("arquivos") : [];
+  if (!files.length) throw new DemoHttpError(400, "Nenhum arquivo recebido");
+  const n = files.reduce((acc, f) => acc + (typeof f !== "string" && /\.zip$/i.test(f.name) ? 60 : 1), 0);
+  return { recebidos: n, gravados: n, iguais: 0, substituidos: 0, semDestino: 0, invalidos: 0 };
+});
+route("POST", "/import/carteira", ({ body }) => {
+  const dryRun = body instanceof FormData && body.get("dryRun") === "true";
+  const id = `demo-${Date.now()}`;
+  demoJobs.set(id, { inicio: Date.now(), total: 600, dryRun });
+  return { jobId: id, total: 600, dryRun };
+});
+route("GET", "/import/carteira/:id", ({ params }) => {
+  const j = demoJobs.get(params.id);
+  if (!j) throw new DemoHttpError(404, "Importação não encontrada");
+  const feitos = Math.min(j.total, Math.round(((Date.now() - j.inicio) / 4000) * j.total));
+  const done = feitos >= j.total;
+  return {
+    id: params.id,
+    status: done ? "concluido" : "processando",
+    dryRun: j.dryRun,
+    feitos,
+    total: j.total,
+    iniciadoEm: new Date(j.inicio).toISOString(),
+    concluidoEm: done ? new Date().toISOString() : null,
+    erro: null,
+    resultado: done
+      ? {
+          dryRun: j.dryRun,
+          seguradorasNaoMapeadas: {},
+          stats: { clientesLidos: 600, clientesCriados: 590, clientesAtualizados: 8, clientesSemCpf: 2, apolicesCriadas: 1790, apolicesDuplicadas: 21, apolicesSemSeguradora: 0, documentosCriados: 2370, documentosJaExistentes: 0, arquivosForaDoStorage: 0, arquivosInexistentes: 11, parcelas: 9120, itens: 1610 },
+        }
+      : null,
+  };
+});
 
 /* ---------------- dashboard ---------------- */
 route("GET", "/dashboard/summary", ({ d }): DashboardSummary => {

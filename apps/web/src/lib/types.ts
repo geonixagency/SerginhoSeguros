@@ -33,6 +33,56 @@ export interface User {
   nome: string;
   email: string;
   perfil: Perfil;
+  /** Data URL da foto de perfil (null/ausente = iniciais). */
+  avatar?: string | null;
+}
+export interface ProfileUpdate {
+  nome?: string;
+  avatar?: string | null;
+}
+
+/* ---------- Importação da carteira (Configurações, só ADMIN) ---------- */
+export interface ImportEstado {
+  clientes: number;
+  apolices: number;
+  documentos: number;
+  /** Nomes de PDF conhecidos pelo último policies.json enviado (para casar PDFs soltos). */
+  indicePdfs: number;
+  importacaoEmAndamento: string | null;
+}
+export interface PdfBatchStats {
+  recebidos: number;
+  gravados: number;
+  iguais: number;
+  substituidos: number;
+  semDestino: number;
+  invalidos: number;
+}
+export interface ImportStats {
+  clientesLidos: number;
+  clientesCriados: number;
+  clientesAtualizados: number;
+  clientesSemCpf: number;
+  apolicesCriadas: number;
+  apolicesDuplicadas: number;
+  apolicesSemSeguradora: number;
+  documentosCriados: number;
+  documentosJaExistentes: number;
+  arquivosForaDoStorage: number;
+  arquivosInexistentes: number;
+  parcelas: number;
+  itens: number;
+}
+export interface ImportJob {
+  id: string;
+  status: "processando" | "concluido" | "erro";
+  dryRun: boolean;
+  feitos: number;
+  total: number;
+  iniciadoEm: string;
+  concluidoEm: string | null;
+  resultado: { stats: ImportStats; seguradorasNaoMapeadas: Record<string, number>; status?: Record<string, number>; dryRun: boolean } | null;
+  erro: string | null;
 }
 export interface AuthResponse {
   accessToken: string;

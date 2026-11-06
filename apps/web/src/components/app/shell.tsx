@@ -13,6 +13,7 @@ import {
   Search,
   Settings,
   Globe,
+  UserRound,
 } from "lucide-react";
 import { AnimatedLogo } from "@/components/brand/animated-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -75,7 +76,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="border-t border-sidebar-border p-3">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.04]">
-            <Avatar nome={user?.nome ?? "Equipe"} className="size-9" tone="gold" />
+            <Avatar nome={user?.nome ?? "Equipe"} src={user?.avatar} className="size-9" tone="gold" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-ivory-50">{user?.nome ?? "—"}</span>
               <span className="block truncate text-xs text-sidebar-muted">{user?.perfil === "ADMIN" ? "Administradora" : "Operador"}</span>
@@ -84,6 +85,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-60">
             <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => router.push("/app/configuracoes?aba=perfil")}>
+              <UserRound /> Meu perfil
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => router.push("/app/configuracoes")}>
               <Settings /> Configurações
             </DropdownMenuItem>
@@ -111,6 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const pathname = usePathname();
+  const { user } = useAuth();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -168,6 +173,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-gold-500 ring-2 ring-background" />
               </Link>
               <ThemeToggle className="hover:bg-sunken" />
+              <Link
+                href="/app/configuracoes?aba=perfil"
+                aria-label="Meu perfil"
+                title={user?.nome}
+                className="ml-1 rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-gold-500"
+              >
+                <Avatar nome={user?.nome ?? "Equipe"} src={user?.avatar} className="size-8 text-[13px]" tone="gold" />
+              </Link>
             </div>
           </div>
         </header>

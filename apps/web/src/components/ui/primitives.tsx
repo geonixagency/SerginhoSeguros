@@ -182,9 +182,15 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 /* ---------- Avatar (iniciais) ---------- */
-export function Avatar({ nome, className, tone = "ink" }: { nome: string; className?: string; tone?: "ink" | "gold" }) {
+export function Avatar({ nome, className, tone = "ink", src }: { nome: string; className?: string; tone?: "ink" | "gold"; src?: string | null }) {
   const p = nome.trim().split(/\s+/);
   const ini = ((p[0]?.[0] ?? "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- data URL pequena, sem otimização do Next
+      <img src={src} alt="" aria-hidden className={cn("inline-block size-9 shrink-0 rounded-full object-cover ring-1 ring-gold-500/40", className)} />
+    );
+  }
   return (
     <span
       aria-hidden

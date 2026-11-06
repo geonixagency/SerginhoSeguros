@@ -69,6 +69,10 @@ import type {
   MessageStatus,
   MessageTemplate,
   CreateTemplateInput,
+  ProfileUpdate,
+  ImportEstado,
+  ImportJob,
+  PdfBatchStats,
   BroadcastSource,
   Paginated,
   ParseResult,
@@ -558,6 +562,26 @@ export const realApi = {
     refresh: () => http.post<Omit<AuthResponse, "user"> & { user?: User }>("/auth/refresh"),
     me: (): Promise<User> => http.get<UserDTO>("/auth/me"),
     logout: () => http.post<{ ok: boolean }>("/auth/logout"),
+    updateProfile: (data: ProfileUpdate) => http.patch<User>("/auth/me", data),
+    forgotPassword: (email: string) => http.post<{ ok: boolean }>("/auth/forgot-password", { email }),
+    resetPassword: (token: string, senha: string) => http.post<{ ok: boolean }>("/auth/reset-password", { token, senha }),
+  },
+  importacao: {
+    estado: () => http.get<ImportEstado>("/import/estado"),
+    /** Um lote por requisição: .zip(s) com a pasta base/seguradora e/ou PDFs soltos. */
+    pdfs: (files: File[]) => {
+      const fd = new FormData();
+      for (const f of files) fd.append("arquivos", f, (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name);
+      return http.post<PdfBatchStats>("/import/pdfs", fd);
+    },
+    carteira: (clients: File, policies: File, dryRun: boolean) => {
+      const fd = new FormData();
+      fd.append("dryRun", String(dryRun));
+      fd.append("clients", clients, "clients.json");
+      fd.append("policies", policies, "policies.json");
+      return http.post<{ jobId: string; total: number; dryRun: boolean }>("/import/carteira", fd);
+    },
+    job: (id: string) => http.get<ImportJob>(`/import/carteira/${id}`),
   },
   dashboard: {
     summary: async (): Promise<DashboardSummary> => {

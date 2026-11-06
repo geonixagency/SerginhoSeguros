@@ -23,6 +23,7 @@ import leadRoutes from "./modules/leads/routes";
 import publicRoutes from "./modules/public/routes";
 import quoteRoutes from "./modules/quotes/routes";
 import taskRoutes from "./modules/tasks/routes";
+import importRoutes from "./modules/importacao/routes";
 import { webhookRoutes } from "./modules/messaging/webhook";
 
 export async function buildApp() {
@@ -30,7 +31,7 @@ export async function buildApp() {
     logger: {
       level: env.LOG_LEVEL,
       // Nunca logar credenciais/tokens que passem por headers ou body.
-      redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.apikey", "*.senha", "*.valores"],
+      redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.apikey", "*.senha", "*.valores", "*.token"],
       ...(env.NODE_ENV === "development" ? { transport: { target: "pino-pretty" } } : {}),
     },
     trustProxy: true, // atrás do Caddy
@@ -92,6 +93,7 @@ export async function buildApp() {
         await priv.register(leadRoutes, { prefix: "/leads" });
         await priv.register(quoteRoutes, { prefix: "/quotes" });
         await priv.register(taskRoutes, { prefix: "/tasks" });
+        await priv.register(importRoutes, { prefix: "/import" });
       });
       // Webhook da Evolution: autenticado por token próprio, não por JWT.
       await api.register(webhookRoutes, { prefix: "/webhooks" });

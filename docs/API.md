@@ -25,7 +25,10 @@ exporta TypeScript puro, então no Next.js use `transpilePackages: ['@ss/shared'
 | POST | `/auth/login` | `{ email, senha }`. Devolve `{ accessToken, expiresIn, user }` e grava o cookie httpOnly `ss_rt` (path `/api/auth`). |
 | POST | `/auth/refresh` | Sem corpo; usa o cookie. Rotaciona o refresh e devolve um novo `accessToken`. Se um refresh já usado for reapresentado, a sessão inteira é revogada. |
 | POST | `/auth/logout` | Revoga o refresh e apaga o cookie. |
-| GET | `/auth/me` | Devolve o `UserDTO`. |
+| GET | `/auth/me` | Devolve o `UserDTO` (inclui `avatar`, data URL ou `null`). |
+| PATCH | `/auth/me` | `ProfileUpdateSchema`: `{ nome?, avatar? }`. Foto em data URL JPEG/PNG/WebP (até 300 mil caracteres; a tela recorta e reduz para 256 px). `avatar: null` remove. |
+| POST | `/auth/forgot-password` | `{ email }`. Sempre `200 { ok: true }` (não revela se o e-mail existe). Envia por e-mail `WEB_URL/redefinir-senha?token=...`, uso único, 1 h; no banco só o hash. `503` se o SMTP não estiver configurado. Limite: 5 por 15 min. |
+| POST | `/auth/reset-password` | `{ token, senha }` (senha com 10+ caracteres). Troca a senha, invalida o link e encerra todas as sessões. `400` para link inválido, usado ou expirado. Limite: 10 por 15 min. |
 
 Envie `Authorization: Bearer <accessToken>`; o token vale 15 min. Chame o refresh com `credentials: 'include'`.
 Em produção (front na Vercel e API na VPS) o cookie é `Secure; SameSite=None`, e `CORS_ORIGIN` lista os domínios do front.
@@ -33,6 +36,17 @@ Em produção (front na Vercel e API na VPS) o cookie é `Secure; SameSite=None`
 ## Usuários
 
 `GET /users`, `POST /users` **[ADMIN]** (`UserCreateSchema`) e `PATCH /users/:id` **[ADMIN]**.
+
+## Importação da carteira **[ADMIN]**
+
+| Método | Rota | Corpo / observações |
+|---|---|---|
+| GET | `/import/estado` | Contagens (clientes, apólices, documentos, PDFs no índice) e job em andamento. |
+| POST | `/import/pdfs` | Multipart, campo `arquivos` (um ou mais `.zip`/`.pdf`, até 60 MB cada). Zips com `seguradora/<cliente>/...pdf` (ou `base/seguradora/...`) são gravados em `STORAGE_DIR` mantendo o caminho; PDF solto casa pelo nome com o último `policies.json`. Reenvio do mesmo arquivo não duplica. Devolve `{ recebidos, gravados, iguais, substituidos, semDestino, invalidos }`. |
+| POST | `/import/carteira` | Multipart com `clients` e `policies` (JSON do extrator, até 40 MB cada) e `dryRun=true|false`. Responde `202 { jobId, total }` e processa em segundo plano (uma importação por vez; `409` se já houver uma). |
+| GET | `/import/carteira/:jobId` | Progresso `{ status, feitos, total, resultado }`. |
+
+Regras iguais às de `scripts/import`: cliente por CPF/CNPJ (só completa campos vazios), apólice por seguradora + número, PDF por caminho ou hash, parcelas vencidas como pagas e recálculo de ATIVO/INATIVO no fim. Tudo vai para a auditoria (`IMPORTAR_PDFS`, `IMPORTAR_CARTEIRA`, `SIMULAR_IMPORTACAO`).
 
 ## Dashboard
 

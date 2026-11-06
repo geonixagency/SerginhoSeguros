@@ -9,6 +9,8 @@ interface AuthState {
   status: "loading" | "authenticated" | "anonymous";
   login: (email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Atualiza o usuário em memória (ex.: depois de salvar Meu perfil). */
+  updateUser: (u: User) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -82,7 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("anonymous");
   }, []);
 
-  const value = useMemo(() => ({ user, status, login, logout }), [user, status, login, logout]);
+  const updateUser = useCallback((u: User) => {
+    setUser(u);
+    if (IS_DEMO) {
+      try {
+        sessionStorage.setItem(DEMO_KEY, JSON.stringify(u));
+      } catch {
+        /* sem storage */
+      }
+    }
+  }, []);
+
+  const value = useMemo(() => ({ user, status, login, logout, updateUser }), [user, status, login, logout, updateUser]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
