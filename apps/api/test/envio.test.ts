@@ -124,10 +124,26 @@ describe.skipIf(!enabled)("rotas de envio (integração)", async () => {
     await prisma.messagingSettings.update({ where: { id: 1 }, data: { pausado: before.pausado } });
   });
 
-  it("POST /public/leads cria lead sem login; honeypot preenchido é recusado", async () => {
-    const r = await app.inject({ method: "POST", url: "/api/public/leads", payload: { nome: "Visitante Teste", telefone: TEL, produto: "auto" } });
-    expect(r.statusCode).toBe(201);
-    expect(r.json()).toEqual({ ok: true });
+  it("POST /public/leads cria lead sem login, avisa por e-mail; honeypot preenchido é recusado", async () => {
+    const { setMailSenderForTests } = await import("../src/lib/mailer");
+    const enviados: Array<{ to: string; subject: string; text: string; html?: string }> = [];
+    setMailSenderForTests(async (m) => {
+      enviados.push(m);
+    });
+    try {
+      const r = await app.inject({ method: "POST", url: "/api/public/leads", payload: { nome: "Visitante <Teste>", telefone: TEL, produto: "auto", mensagem: "Quiz: carro" } });
+      expect(r.statusCode).toBe(201);
+      expect(r.json()).toEqual({ ok: true });
+      await new Promise((ok) => setTimeout(ok, 200));
+      expect(enviados).toHaveLength(1);
+      expect(enviados[0]!.to).toContain("@");
+      expect(enviados[0]!.subject).toContain("Visitante <Teste>");
+      expect(enviados[0]!.text).toContain("Quiz: carro");
+      expect(enviados[0]!.html).toContain("Visitante &lt;Teste&gt;");
+      expect(enviados[0]!.html).not.toContain("<Teste>");
+    } finally {
+      setMailSenderForTests(null);
+    }
     const bot = await app.inject({ method: "POST", url: "/api/public/leads", payload: { nome: "Bot", telefone: TEL, site: "http://spam" } });
     expect(bot.statusCode).toBe(400);
     expect(await prisma.lead.count({ where: { telefone: TEL, origem: "site" } })).toBe(1);

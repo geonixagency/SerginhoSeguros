@@ -65,6 +65,8 @@ const EnvSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  /** Quem recebe o aviso de lead novo do site (vírgulas para vários). Vazio = e-mail dos administradores ativos. */
+  LEAD_NOTIFY_TO: z.string().optional(),
   /** false = este processo não roda worker/agendador (útil para escalar só a API). */
   RUN_WORKER: z
     .string()
