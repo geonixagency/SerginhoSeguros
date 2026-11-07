@@ -13,9 +13,9 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Serginho Seguros — Consórcios e Planos", template: "%s · Serginho Seguros" },
+  title: { default: "Serginho Seguros — Sua escolha inteligente em seguros", template: "%s · Serginho Seguros" },
   description:
-    "Corretora de seguros de Sergio e Viviani Rosalim: vida, auto, empresarial, residencial, imóveis e consórcio. Atendimento próximo, cotação rápida e acompanhamento de verdade.",
+    "Corretora de seguros de Sergio e Vivian Rosalim: vida, automóveis, empresarial, residencial, imóveis e consórcio. Atendimento próximo, cotação rápida e acompanhamento de verdade.",
   icons: { icon: "/icon.svg" },
 };
 

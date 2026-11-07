@@ -104,7 +104,7 @@ const PRODUCTS: { ramo: Ramo; icon: typeof Car; title: string; text: string; poi
 ];
 
 const DIFERENCIAIS = [
-  { icon: UserRound, title: "Você fala com quem decide", text: "Sergio e Viviani atendem pessoalmente. Sem robô, sem fila, sem protocolo perdido." },
+  { icon: UserRound, title: "Você fala com quem decide", text: "Sergio e Vivian atendem pessoalmente. Sem robô, sem fila, sem protocolo perdido." },
   { icon: Scale, title: "Várias seguradoras, uma conversa", text: "Cotamos nas principais companhias do mercado e explicamos a diferença em português claro." },
   { icon: BellRing, title: "A gente avisa antes", text: "Avisamos pelo WhatsApp antes do vencimento da parcela e da renovação, e lembramos dos pagamentos em aberto. Seu seguro não vence por esquecimento." },
   { icon: ShieldCheck, title: "Do seu lado no sinistro", text: "Quando o imprevisto acontece, acompanhamos cada etapa junto da seguradora até a solução." },
@@ -119,7 +119,7 @@ function SiteHeader() {
           <AnimatedLogo uid="hdr" animate={false} className="size-10" />
           <span className="leading-none">
             <span className="block font-display text-[19px] font-bold tracking-wide">Serginho Seguros</span>
-            <span className="block text-[10.5px] font-semibold uppercase tracking-[0.22em] text-gold-700 dark:text-gold-300/80">Consórcios e planos</span>
+            <span className="block whitespace-nowrap text-[11.5px] font-semibold text-gold-700 sm:text-[10.5px] sm:uppercase sm:tracking-[0.22em] dark:text-gold-300/80">Sua escolha inteligente em seguros</span>
           </span>
         </Link>
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Principal">
@@ -196,7 +196,7 @@ function Hero({ replay }: { replay: number }) {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="mb-6 inline-flex items-center gap-2 rounded-full border border-gold-500/40 bg-gold-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-gold-800 dark:border-gold-500/30 dark:bg-gold-400/5 dark:text-gold-300"
           >
-            <span className="size-1.5 rounded-full bg-gold-400" /> Corretora de seguros · há mais de 10 anos
+            <span className="size-1.5 rounded-full bg-gold-400" /> Corretora de seguros · +10 anos
           </motion.p>
           <FocusReveal
             as="h1"
@@ -208,14 +208,14 @@ function Hero({ replay }: { replay: number }) {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.6 }} className="mt-7 text-lg text-ink-900/80 sm:text-xl dark:text-ivory-100/80">
             <TextCarousel
               prefix="Cuidamos do seu"
-              texts={["carro", "futuro", "negócio", "lar", "imóvel", "consórcio"]}
+              texts={["veículo", "futuro", "negócio", "lar", "imóvel", "consórcio"]}
               className="font-medium"
               prefixClassName="text-ink-900/75 dark:text-ivory-100/75"
               badgeClassName="rounded-lg bg-gold-gradient py-0.5 font-display text-[1.35em] font-bold italic text-ink-950"
             />
           </motion.div>
           <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.35, duration: 0.6 }} className="mt-6 max-w-xl text-[15px] leading-relaxed text-ink-900/70 dark:text-ivory-100/65">
-            Sergio e Viviani Rosalim comparam as melhores seguradoras para você e continuam por perto depois da assinatura — na renovação, na parcela e, principalmente, no sinistro.
+            Sergio e Vivian Rosalim comparam as melhores seguradoras para você e continuam por perto depois da assinatura — na renovação, na parcela e, principalmente, no sinistro.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.5, duration: 0.6 }} className="mt-9 flex flex-wrap gap-3">
             <Magnetic>
@@ -379,7 +379,7 @@ function About() {
             <blockquote className="relative font-display text-2xl leading-snug text-ivory-50 sm:text-[28px]">
               “Cada apólice tem um nome, um telefone e uma história. É assim que a gente trabalha.”
             </blockquote>
-            <p className="relative mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-gold-300/80">Sergio &amp; Viviani Rosalim</p>
+            <p className="relative mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-gold-300/80">Sergio &amp; Vivian Rosalim</p>
           </div>
           <div className="absolute -bottom-5 -right-3 rounded-2xl border border-border bg-surface px-5 py-4 shadow-[var(--shadow-lift)] sm:-right-6">
             <p className="font-display text-3xl font-bold text-accent-text">
@@ -393,7 +393,7 @@ function About() {
           <SectionTitle id="sobre-title" eyebrow="Quem somos" title="Uma corretora de família, para famílias e negócios." />
           <div className="mt-6 space-y-4 text-[15.5px] leading-relaxed text-muted">
             <p>
-              A Serginho Seguros nasceu do jeito mais simples: atender bem quem confia na gente. À frente da corretora, <strong className="text-foreground">Sergio e Viviani Rosalim</strong> somam mais de dez anos cuidando de seguros de vida, automóveis, residência, empresas, imóveis e consórcios.
+              A Serginho Seguros nasceu do jeito mais simples: atender bem quem confia na gente. À frente da corretora, <strong className="text-foreground">Sergio e Vivian Rosalim</strong> somam mais de dez anos cuidando de seguros de vida, automóveis, residência, empresas, imóveis e consórcios.
             </p>
             <p>
               Não vendemos a apólice mais cara nem a mais barata — vendemos a certa. Comparamos as seguradoras, explicamos cada cobertura e ficamos disponíveis no WhatsApp para o que der e vier.
@@ -513,7 +513,7 @@ function QuoteForm({ produto, setProduto }: { produto: Ramo; setProduto: (r: Ram
                   </svg>
                 </motion.div>
                 <p className="mt-6 font-display text-3xl font-semibold">Pedido recebido!</p>
-                <p className="mt-2 max-w-xs text-[15px] text-stone-600 dark:text-ivory-100/65">Em breve o Sergio ou a Viviani chamam você no WhatsApp com a cotação de {RAMO_LABEL[produto].toLowerCase()}.</p>
+                <p className="mt-2 max-w-xs text-[15px] text-stone-600 dark:text-ivory-100/65">Em breve o Sergio ou a Vivian chamam você no WhatsApp com a cotação de {RAMO_LABEL[produto].toLowerCase()}.</p>
                 <Button variant="outline" className="mt-6" onClick={() => setState("idle")}>
                   Fazer outro pedido
                 </Button>
@@ -584,7 +584,7 @@ function Footer() {
           <AnimatedLogo uid="ftr" animate={false} className="size-14" />
           <div>
             <p className="font-display text-xl font-bold text-ivory-50">Serginho Seguros</p>
-            <p className="text-sm">Consórcios e planos · Sergio &amp; Viviani Rosalim</p>
+            <p className="text-sm">Sua escolha inteligente em seguros · Sergio &amp; Vivian Rosalim</p>
           </div>
         </div>
         <nav aria-label="Rodapé" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">

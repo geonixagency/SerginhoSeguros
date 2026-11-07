@@ -544,7 +544,7 @@ route("POST", "/clients/from-pdf", ({ d, body }) => {
     optOut: false,
     criadoEm: now(),
   });
-  d.timeline[id] = [{ id: `tl-${id}`, tipo: "CADASTRO", titulo: "Cliente criado a partir do PDF", descricao: "Campos revisados manualmente", data: now(), autor: "Viviani" }];
+  d.timeline[id] = [{ id: `tl-${id}`, tipo: "CADASTRO", titulo: "Cliente criado a partir do PDF", descricao: "Campos revisados manualmente", data: now(), autor: "Vivian" }];
   return { clientId: id, criado: true };
 });
 

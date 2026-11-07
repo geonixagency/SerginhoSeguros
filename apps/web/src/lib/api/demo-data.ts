@@ -294,7 +294,7 @@ export function buildDemoDB(): DemoDB {
   for (const c of clients) {
     const ps = policies.filter((p) => p.clientId === c.id);
     const ev: TimelineEvent[] = [
-      { id: `tl-${c.id}-0`, tipo: "CADASTRO", titulo: "Cliente cadastrado", descricao: `Origem: ${c.origem}`, data: c.criadoEm, autor: "Viviani" },
+      { id: `tl-${c.id}-0`, tipo: "CADASTRO", titulo: "Cliente cadastrado", descricao: `Origem: ${c.origem}`, data: c.criadoEm, autor: "Vivian" },
     ];
     ps.forEach((p, idx) => {
       ev.push({ id: `tl-${c.id}-p${idx}`, tipo: "APOLICE", titulo: `Apólice ${p.numero} emitida`, descricao: `${p.seguradora} · ${p.ramo.toLowerCase()}`, data: p.emissao, autor: "Sergio" });
@@ -345,7 +345,7 @@ export function buildDemoDB(): DemoDB {
       produto: pick(["AUTO", "AUTO", "VIDA", "RESIDENCIAL", "EMPRESARIAL", "CONSORCIO", "IMOBILIARIO"] as const),
       origem: pick(origens),
       etapa: stages[k % stages.length],
-      responsavel: pick(["Sergio", "Viviani"]),
+      responsavel: pick(["Sergio", "Vivian"]),
       proximoContato: rand() > 0.3 ? iso(today + between(-2, 9) * DAY) : null,
       notas: pick(notas),
       valorEstimado: between(8, 90) * 100,

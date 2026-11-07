@@ -158,7 +158,7 @@ export function InsuranceQuiz({ onQuote }: { onQuote: (r: Ramo) => void }) {
           <h2 id="quiz-title" className="font-display text-4xl font-semibold leading-[1.02] tracking-[-0.015em] sm:text-5xl">
             Qual seguro é <span className="text-accent-text">pra você?</span>
           </h2>
-          <p className="mt-4 max-w-md text-base leading-relaxed text-muted sm:text-lg">Três perguntas rápidas e a gente indica por onde começar. Se gostar, o Sergio ou a Viviani preparam a cotação.</p>
+          <p className="mt-4 max-w-md text-base leading-relaxed text-muted sm:text-lg">Três perguntas rápidas e a gente indica por onde começar. Se gostar, o Sergio ou a Vivian preparam a cotação.</p>
         </div>
 
         <div className="relative overflow-hidden rounded-[28px] border border-border bg-surface p-6 shadow-[var(--shadow-lift)] sm:p-9">

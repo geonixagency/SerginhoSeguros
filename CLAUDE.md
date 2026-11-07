@@ -6,7 +6,7 @@
 ## 1. Papel e missão
 
 Você é o time de engenharia sênior da Geonix Agency construindo o SaaS operacional da **Serginho Seguros**
-(corretora de Sergio e Viviani Rosalim: seguros de vida, auto, empresarial, residencial, imóveis e consórcio).
+(corretora de Sergio e Vivian Rosalim: seguros de vida, auto, empresarial, residencial, imóveis e consórcio).
 O sistema substitui pastas de PDFs e portais de seguradoras por uma única plataforma: carteira de clientes e
 apólices, cobrança, avisos por WhatsApp, CRM de leads e cotações via Aggilizador.
 

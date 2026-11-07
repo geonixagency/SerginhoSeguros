@@ -9,7 +9,7 @@ const PNG_1PX = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1H
 
 describe("schemas de perfil e senha", () => {
   it("ProfileUpdateSchema aceita nome e foto em data URL, recusa outros formatos", () => {
-    expect(ProfileUpdateSchema.safeParse({ nome: "Viviani" }).success).toBe(true);
+    expect(ProfileUpdateSchema.safeParse({ nome: "Vivian" }).success).toBe(true);
     expect(ProfileUpdateSchema.safeParse({ avatar: PNG_1PX }).success).toBe(true);
     expect(ProfileUpdateSchema.safeParse({ avatar: null }).success).toBe(true);
     expect(ProfileUpdateSchema.safeParse({}).success).toBe(false);
