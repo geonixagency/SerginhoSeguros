@@ -201,9 +201,12 @@ route("GET", "/dashboard/summary", ({ d }): DashboardSummary => {
     premioCarteira: vig.reduce((s, p) => s + p.premioTotal, 0),
     variacao: { ativos: 4.2, novosMes: 16.7, apolicesVigentes: 3.1, premioCarteira: 6.8 },
     alertas: [
+      ...(() => {
+        const n = d.leads.filter((l) => l.origem === "site" && l.etapa === "NOVO").length;
+        return n ? [{ id: "NOVOS_CONTATOS_SITE", nivel: "atencao" as const, titulo: n === 1 ? "1 novo contato pelo site aguardando retorno" : `${n} novos contatos pelo site aguardando retorno`, descricao: "Pedidos de cotação pelo site ou pelo quiz que ainda estão em Novo no CRM.", href: "/app/crm", total: n }] : [];
+      })(),
       { id: "al-1", nivel: "critico", titulo: `${atrasadas} parcelas em atraso`, descricao: "Coberturas podem ser suspensas. Régua “problema no pagamento” já agendada.", href: "/app/disparos" },
       ...(tokio ? [{ id: "al-2", nivel: "atencao" as const, titulo: `Integração ${tokio.nome} com erro`, descricao: "Token expirado. Atualize a credencial para voltar a consultar boletos.", href: `/app/seguradoras/${tokio.id}` }] : []),
-      { id: "al-3", nivel: "info", titulo: "3 leads do site sem contato há 24h", descricao: "Novos pedidos de cotação aguardando primeiro retorno.", href: "/app/crm" },
     ],
   };
 });

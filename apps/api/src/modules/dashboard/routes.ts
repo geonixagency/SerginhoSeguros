@@ -44,7 +44,7 @@ async function countNewClientsThisMonth(): Promise<number> {
 export default async function dashboardRoutes(app: FastifyInstance) {
   app.get("/summary", async (): Promise<DashboardSummaryDTO> => {
     const today = todayIso();
-    const [ativos, inativos, novos, vigentes, premio, atrasadas, d7, d15, d30, d60, semTelefone, venceHoje] = await Promise.all([
+    const [ativos, inativos, novos, vigentes, premio, atrasadas, d7, d15, d30, d60, semTelefone, venceHoje, contatosSite] = await Promise.all([
       prisma.client.count({ where: { status: "ATIVO" } }),
       prisma.client.count({ where: { status: "INATIVO" } }),
       countNewClientsThisMonth(),
@@ -57,9 +57,12 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       countExpiring(today, 60),
       prisma.client.count({ where: { status: "ATIVO", OR: [{ telefone: null }, { telefone: "" }] } }),
       prisma.installment.count({ where: { status: "PENDENTE", vencimento: dateOnly(today) } }),
+      // Pedidos do site (formulário e quiz) ainda na etapa NOVO do CRM: somem do alerta quando alguém dá andamento.
+      prisma.lead.count({ where: { origem: "site", etapa: "NOVO", createdAt: { gte: new Date(Date.now() - 30 * 86_400_000) } } }),
     ]);
 
     const alertas: DashboardSummaryDTO["alertas"] = [];
+    if (contatosSite > 0) alertas.push({ tipo: "NOVOS_CONTATOS_SITE", nivel: "atencao", mensagem: contatosSite === 1 ? "1 novo contato pelo site aguardando retorno" : `${contatosSite} novos contatos pelo site aguardando retorno`, total: contatosSite });
     if (atrasadas > 0) alertas.push({ tipo: "PARCELAS_ATRASADAS", nivel: "critico", mensagem: `${atrasadas} parcela(s) em atraso ou com falha`, total: atrasadas });
     if (d7 > 0) alertas.push({ tipo: "VENCENDO_7_DIAS", nivel: "atencao", mensagem: `${d7} apólice(s) vencem nos próximos 7 dias`, total: d7 });
     if (venceHoje > 0) alertas.push({ tipo: "PARCELAS_HOJE", nivel: "info", mensagem: `${venceHoje} parcela(s) vencem hoje`, total: venceHoje });

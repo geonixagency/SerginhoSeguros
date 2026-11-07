@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   ChevronsUpDown,
@@ -21,7 +22,7 @@ import { CommandPalette } from "./command-palette";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/overlays";
 import { Avatar, Badge } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/auth";
-import { IS_DEMO } from "@/lib/api";
+import { api, IS_DEMO } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import { NAV } from "./nav";
@@ -111,6 +112,54 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+const NIVEL_DOT = { critico: "bg-danger", atencao: "bg-gold-500", info: "bg-info" } as const;
+
+/** Sininho do topo: lista os alertas do painel; o número destaca contatos novos do site ainda sem retorno. */
+function AlertsBell() {
+  const router = useRouter();
+  const { data } = useQuery({ queryKey: ["dash", "summary"], queryFn: api.dashboard.summary, refetchInterval: 60_000, staleTime: 30_000 });
+  const alertas = data?.alertas ?? [];
+  const contatos = alertas.find((a) => a.id === "NOVOS_CONTATOS_SITE")?.total ?? 0;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="relative grid size-10 place-items-center rounded-[10px] text-foreground outline-none hover:bg-sunken focus-visible:ring-2 focus-visible:ring-gold-500"
+          aria-label={contatos ? `Alertas: ${contatos} contato(s) novo(s) pelo site` : alertas.length ? `Alertas (${alertas.length})` : "Alertas"}
+        >
+          <Bell className="size-[18px]" />
+          {contatos > 0 ? (
+            <span className="absolute right-1 top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[10.5px] font-bold leading-none text-white ring-2 ring-background">
+              {contatos > 9 ? "9+" : contatos}
+            </span>
+          ) : (
+            alertas.length > 0 && <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-gold-500 ring-2 ring-background" />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-80 max-w-[calc(100vw-2rem)]">
+        <DropdownMenuLabel>Alertas</DropdownMenuLabel>
+        {alertas.length === 0 ? (
+          <p className="px-2.5 py-3 text-sm text-muted">Nada pedindo atenção agora.</p>
+        ) : (
+          alertas.map((a) => (
+            <DropdownMenuItem key={a.id} className="h-auto items-start py-2" onSelect={() => router.push(a.href ?? "/app#alertas")}>
+              <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", NIVEL_DOT[a.nivel])} aria-hidden />
+              <span className="min-w-0">
+                <span className="block font-medium leading-snug">{a.titulo}</span>
+                {a.descricao && <span className="mt-0.5 block text-xs leading-relaxed text-muted">{a.descricao}</span>}
+              </span>
+            </DropdownMenuItem>
+          ))
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => router.push("/app#alertas")}>Ver todos no painel</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -168,10 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   Demonstração
                 </Badge>
               )}
-              <Link href="/app#alertas" className="relative grid size-10 place-items-center rounded-[10px] text-foreground hover:bg-sunken" aria-label="Alertas">
-                <Bell className="size-[18px]" />
-                <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-gold-500 ring-2 ring-background" />
-              </Link>
+              <AlertsBell />
               <ThemeToggle className="hover:bg-sunken" />
               <Link
                 href="/app/configuracoes?aba=perfil"

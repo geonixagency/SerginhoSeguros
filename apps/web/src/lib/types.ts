@@ -365,6 +365,8 @@ export interface DashboardAlert {
   titulo: string;
   descricao: string;
   href?: string;
+  /** Quantidade por trás do alerta (ex.: contatos novos do site). */
+  total?: number;
 }
 export interface ExpiringPolicy extends Policy {
   diasRestantes: number;

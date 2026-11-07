@@ -671,6 +671,7 @@ export const realApi = {
         VENCENDO_7_DIAS: "/app",
         PARCELAS_HOJE: "/app",
         SEM_TELEFONE: "/app/clientes",
+        NOVOS_CONTATOS_SITE: "/app/crm",
       };
       return {
         ativos: s.clientesAtivos,
@@ -681,7 +682,7 @@ export const realApi = {
         variacao: null,
         parcelasAtrasadas: s.parcelasAtrasadas,
         vencendo: s.vencendo,
-        alertas: s.alertas.map((a) => ({ id: a.tipo, nivel: a.nivel, titulo: a.mensagem, descricao: "", href: HREF[a.tipo] })),
+        alertas: s.alertas.map((a) => ({ id: a.tipo, nivel: a.nivel, titulo: a.mensagem, descricao: a.tipo === "NOVOS_CONTATOS_SITE" ? "Pedidos de cotação pelo site ou pelo quiz que ainda estão em Novo no CRM." : "", href: HREF[a.tipo], total: a.total })),
       };
     },
     expiring: async (f: ExpiringFilter): Promise<ExpiringPolicy[]> => {
