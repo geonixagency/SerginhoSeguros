@@ -152,6 +152,9 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
       gsap:
         specifier: ^3.15.1
         version: 3.15.1

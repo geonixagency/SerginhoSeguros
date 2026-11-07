@@ -16,6 +16,10 @@ import type {
   DashboardCharts,
   DashboardSummary,
   ExpiringPolicy,
+  ExpiringFilter,
+  Claim,
+  ClaimInput,
+  ClaimsQuery,
   Installment,
   InstallmentsDue,
   Insurer,
@@ -102,9 +106,18 @@ const demoApi = {
     limpar: (confirmacao: string) =>
       http.post<{ clientes: number; apolices: number; documentos: number; pastasRemovidas: number }>("/import/limpar", { confirmacao }),
   },
+  claims: {
+    list: async (q: ClaimsQuery): Promise<Paginated<Claim>> => {
+      const r = await http.get<{ data: Claim[]; total: number; page: number; pageSize: number }>(`/claims${qs({ ...q })}`);
+      return { items: r.data, total: r.total, page: r.page, pageSize: r.pageSize };
+    },
+    create: (data: ClaimInput) => http.post<Claim>("/claims", data),
+    update: (id: string, data: Partial<Omit<ClaimInput, "clientId">>) => http.patch<Claim>(`/claims/${id}`, data),
+    remove: (id: string) => http.del<void>(`/claims/${id}`),
+  },
   dashboard: {
     summary: () => http.get<DashboardSummary>("/dashboard/summary"),
-    expiring: (days: number) => http.get<ExpiringPolicy[]>(`/dashboard/expiring${qs({ days })}`),
+    expiring: (f: ExpiringFilter) => http.get<ExpiringPolicy[]>(`/dashboard/expiring${qs({ ...f })}`),
     installmentsDue: () => http.get<InstallmentsDue>("/dashboard/installments-due"),
     charts: () => http.get<DashboardCharts>("/dashboard/charts"),
     birthdays: () => http.get<Birthday[]>("/dashboard/birthdays"),

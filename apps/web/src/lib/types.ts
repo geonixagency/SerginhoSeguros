@@ -343,6 +343,51 @@ export interface DashboardAlert {
 export interface ExpiringPolicy extends Policy {
   diasRestantes: number;
   telefone: string;
+  cpfCnpj: string;
+  placas: string[];
+  /** Sinistros registrados nesta apólice. */
+  sinistros: number;
+}
+/** Filtro de "apólices a vencer": próximos N dias ou período personalizado (aaaa-mm-dd, inclusive). */
+export type ExpiringFilter = { days: number } | { de: ISODate; ate: ISODate };
+
+export type ClaimStatus = "ABERTO" | "EM_ANALISE" | "INDENIZADO" | "NEGADO" | "ENCERRADO";
+export interface Claim {
+  id: string;
+  clientId: string;
+  clientNome: string;
+  policyId: string;
+  policyNumero: string | null;
+  ramo: string;
+  seguradora: string;
+  placa: string | null;
+  dataOcorrencia: ISODate;
+  tipo: string;
+  descricao: string;
+  local: string | null;
+  protocolo: string | null;
+  valor: string | null;
+  status: ClaimStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ClaimInput {
+  clientId: string;
+  policyId: string;
+  dataOcorrencia: ISODate;
+  tipo: string;
+  descricao: string;
+  local?: string | null;
+  protocolo?: string | null;
+  valor?: number | null;
+  status?: ClaimStatus;
+}
+export interface ClaimsQuery {
+  clientId?: string;
+  status?: ClaimStatus;
+  q?: string;
+  page?: number;
+  pageSize?: number;
 }
 export interface InstallmentsDue {
   hoje: Installment[];

@@ -78,13 +78,24 @@ export default async function dashboardRoutes(app: FastifyInstance) {
   });
 
   app.get("/expiring", async (req): Promise<{ days: number; total: number; data: ExpiringPolicyDTO[] }> => {
-    const { days } = parse(ExpiringQuerySchema, req.query);
+    const { days, de, ate } = parse(ExpiringQuerySchema, req.query);
     const today = todayIso();
+    // Período personalizado: apólices (não canceladas/renovadas) com fim de vigência no intervalo,
+    // inclusive datas passadas; sem período, as vigentes que vencem nos próximos `days` dias.
+    const where: Prisma.PolicyWhereInput =
+      de && ate
+        ? { status: { notIn: ["CANCELADA", "RENOVADA"] }, fimVigencia: { gte: dateOnly(de), lte: dateOnly(ate) } }
+        : { ...vigenteWhere(today), fimVigencia: { gte: dateOnly(today), lte: dateOnly(addDays(today, days)) } };
     const rows = await prisma.policy.findMany({
-      where: { ...vigenteWhere(today), fimVigencia: { gte: dateOnly(today), lte: dateOnly(addDays(today, days)) } },
-      include: { insurer: true, client: { select: { id: true, nome: true, telefone: true } }, items: { select: { placa: true } } },
-      orderBy: { fimVigencia: "asc" },
-      take: 500,
+      where,
+      include: {
+        insurer: true,
+        client: { select: { id: true, nome: true, telefone: true, cpfCnpj: true } },
+        items: { select: { placa: true } },
+        _count: { select: { claims: true } },
+      },
+      orderBy: [{ fimVigencia: "asc" }, { client: { nome: "asc" } }],
+      take: de ? 5000 : 500,
     });
     const data = rows.map((p) => {
       const fim = toIsoDate(p.fimVigencia) ?? today;
@@ -98,6 +109,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         insurer: insurerSummary(p.insurer),
         client: p.client,
         placas: p.items.map((i) => i.placa).filter((x): x is string => !!x),
+        sinistros: p._count.claims,
       };
     });
     return { days, total: data.length, data };

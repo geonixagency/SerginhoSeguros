@@ -35,6 +35,7 @@ import { SendWhatsAppDialog } from "@/components/app/send-whatsapp";
 import { Button } from "@/components/ui/button";
 import { Avatar, Badge, Card, EmptyState, ErrorState, Skeleton } from "@/components/ui/primitives";
 import { Tabs, TabsContent } from "@/components/ui/overlays";
+import { ClientClaimsCard } from "@/components/app/claims";
 import { WhatsAppIcon } from "@/components/site/whatsapp-icon";
 import { api } from "@/lib/api";
 import type { ClientDetail, DocumentFile, Policy, TimelineType } from "@/lib/types";
@@ -430,6 +431,7 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
           { value: "apolices", label: "Apólices", count: c.apolices.length },
           { value: "parcelas", label: "Parcelas", count: c.parcelas.length },
           { value: "documentos", label: "Documentos", count: c.documentos.length },
+          { value: "sinistros", label: "Sinistros" },
           { value: "mensagens", label: "Mensagens" },
           { value: "timeline", label: "Linha do tempo" },
         ]}
@@ -446,6 +448,9 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
           </TabsContent>
           <TabsContent value="documentos">
             <DocumentosTab c={c} onAttach={() => setAttach(true)} />
+          </TabsContent>
+          <TabsContent value="sinistros">
+            <ClientClaimsCard client={{ id: c.id, nome: c.nome }} />
           </TabsContent>
           <TabsContent value="mensagens">
             <MensagensTab c={c} />

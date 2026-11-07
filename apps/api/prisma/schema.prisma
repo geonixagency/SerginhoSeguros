@@ -179,6 +179,7 @@ model Client {
   quotes      Quote[]
   leads       Lead[]
   tasks       Task[]
+  claims      Claim[]
 
   @@index([cpfCnpj])
   @@index([nome])
@@ -253,6 +254,7 @@ model Policy {
   installments   Installment[]
   items          InsuredItem[]
   documents      Document[]     @relation("PolicyDocuments")
+  claims         Claim[]
 
   @@index([clientId])
   @@index([insurerId])
@@ -471,6 +473,39 @@ model Task {
 
   @@index([status])
   @@map("tasks")
+}
+
+enum ClaimStatus {
+  ABERTO
+  EM_ANALISE
+  INDENIZADO
+  NEGADO
+  ENCERRADO
+}
+
+/// Sinistro registrado pela corretora: o que aconteceu, quando e com qual apólice.
+model Claim {
+  id             String      @id @default(cuid())
+  clientId       String      @map("client_id")
+  client         Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  policyId       String      @map("policy_id")
+  policy         Policy      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  dataOcorrencia DateTime    @map("data_ocorrencia") @db.Date
+  tipo           String
+  descricao      String
+  local          String?
+  /// Número do sinistro/protocolo na seguradora.
+  protocolo      String?
+  valor          Decimal?    @db.Decimal(12, 2)
+  status         ClaimStatus @default(ABERTO)
+  createdBy      String?     @map("created_by")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@index([clientId])
+  @@index([policyId])
+  @@index([dataOcorrencia])
+  @@map("claims")
 }
 
 model AuditLog {

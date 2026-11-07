@@ -2,6 +2,7 @@
 // Convenções: datas de calendário = "aaaa-mm-dd"; instantes = ISO 8601 com fuso;
 // dinheiro = string decimal ("1234.56"); CPF/CNPJ e telefone = só dígitos.
 import type {
+  ClaimStatus,
   ClientStatus,
   ConnectorCapability,
   DocumentTipo,
@@ -436,8 +437,10 @@ export interface ExpiringPolicyDTO {
   diasParaVencer: number;
   premioTotal: string | null;
   insurer: InsurerSummaryDTO;
-  client: { id: string; nome: string; telefone: string | null };
+  client: { id: string; nome: string; telefone: string | null; cpfCnpj: string };
   placas: string[];
+  /** Sinistros registrados nesta apólice. */
+  sinistros: number;
 }
 
 export interface DashboardChartsDTO {
@@ -472,4 +475,25 @@ export interface QuoteSendResponse {
 /** PATCH /messaging/instance: estado da instância + configurações de envio, numa resposta só. */
 export interface MessagingInstanceStatusDTO extends MessagingInstanceDTO {
   settings: MessagingSettingsDTO;
+}
+
+// ---------------------------------------------------------------- sinistros
+export interface ClaimDTO {
+  id: string;
+  clientId: string;
+  clientNome: string;
+  policyId: string;
+  policyNumero: string | null;
+  ramo: string;
+  seguradora: string;
+  placa: string | null;
+  dataOcorrencia: string;
+  tipo: string;
+  descricao: string;
+  local: string | null;
+  protocolo: string | null;
+  valor: string | null;
+  status: ClaimStatus;
+  createdAt: string;
+  updatedAt: string;
 }

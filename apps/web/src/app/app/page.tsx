@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   CalendarClock,
+  Download,
   Cake,
   ChevronRight,
   FileUp,
@@ -30,11 +31,14 @@ import { InstallmentStatusBadge, RamoTag } from "@/components/app/bits";
 import { InsurerBarChart, NewClientsChart, RamoDonut, Sparkline } from "@/components/app/charts";
 import { Button } from "@/components/ui/button";
 import { CountUp } from "@/components/ui/count-up";
-import { Badge, Card, CardHeader, EmptyState, ErrorState, Skeleton } from "@/components/ui/primitives";
+import { Badge, Card, CardHeader, EmptyState, ErrorState, Input, Skeleton } from "@/components/ui/primitives";
+import { toast } from "sonner";
+import { buildXlsx, downloadBlob } from "@/lib/xlsx";
+import type { ExpiringFilter, ExpiringPolicy } from "@/lib/types";
 import { Segmented } from "@/components/ui/overlays";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { cn, firstName, formatBRL, formatDate, formatDayMonth, formatPhone, whatsappLink } from "@/lib/utils";
+import { cn, firstName, formatBRL, formatCpfCnpj, formatDate, formatDayMonth, formatPhone, whatsappLink } from "@/lib/utils";
 import { WhatsAppIcon } from "@/components/site/whatsapp-icon";
 
 function greeting() {
@@ -123,18 +127,85 @@ function Kpis() {
   );
 }
 
+const isoHoje = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+const isoMais = (iso: string, dias: number) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+const dataCal = (iso: string) => new Date(`${iso}T00:00:00Z`);
+
+/** Planilha do recorte: Vencimento, Cliente, CPF/CNPJ, Placa, Seguradora, N° Sinistros. */
+function exportarVencimentos(rows: ExpiringPolicy[], de: string, ate: string) {
+  const blob = buildXlsx(
+    "Vencimentos",
+    ["Vencimento", "Cliente", "CPF/CNPJ", "Placa", "Seguradora", "N° Sinistros"],
+    rows.map((p) => [dataCal(p.fimVigencia), p.clientNome, p.cpfCnpj ? formatCpfCnpj(p.cpfCnpj) : "", (p.placas ?? []).join(", "), p.seguradora, p.sinistros ?? 0]),
+    [13, 42, 20, 18, 26, 13],
+  );
+  downloadBlob(blob, `vencimentos_${de}_a_${ate}.xlsx`);
+}
+
 function Expiring() {
-  const [days, setDays] = useState(30);
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["dash", "expiring", days], queryFn: () => api.dashboard.expiring(days) });
+  const [modo, setModo] = useState<number | "periodo">(30);
+  const [de, setDe] = useState(isoHoje);
+  const [ate, setAte] = useState(() => isoMais(isoHoje(), 30));
+  const periodoOk = /^\d{4}-\d{2}-\d{2}$/.test(de) && /^\d{4}-\d{2}-\d{2}$/.test(ate) && de <= ate;
+  const filtro: ExpiringFilter | null = modo === "periodo" ? (periodoOk ? { de, ate } : null) : { days: modo };
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["dash", "expiring", filtro],
+    queryFn: () => api.dashboard.expiring(filtro!),
+    enabled: !!filtro,
+  });
+  const recorte = modo === "periodo" ? { de, ate } : { de: isoHoje(), ate: isoMais(isoHoje(), modo) };
+  const vazio = modo === "periodo" ? `Nenhuma apólice vence entre ${formatDate(de)} e ${formatDate(ate)}.` : `Nenhuma apólice vence nos próximos ${modo} dias.`;
   return (
     <Card className="flex flex-col xl:col-span-2">
       <CardHeader
         icon={<CalendarClock />}
         title="Apólices a vencer"
         description="Renove antes do cliente lembrar."
-        action={<Segmented ariaLabel="Período" layoutId="exp-days" value={days} onChange={setDays} options={[7, 15, 30, 60].map((d) => ({ value: d, label: `${d}d` }))} />}
+        action={
+          <Segmented
+            ariaLabel="Período"
+            layoutId="exp-days"
+            value={modo}
+            onChange={setModo}
+            options={[...[7, 15, 30, 60].map((d) => ({ value: d as number | "periodo", label: `${d}d` })), { value: "periodo" as const, label: "Período" }]}
+          />
+        }
       />
-      <div className="mt-4 flex-1">
+      <div className="flex flex-wrap items-end gap-2 px-5 pt-4">
+        {modo === "periodo" && (
+          <>
+            <label className="grid gap-1 text-xs font-semibold text-muted">
+              De
+              <Input type="date" value={de} max={ate || undefined} onChange={(e) => setDe(e.target.value)} className="h-9 w-[150px]" aria-label="Vencimento a partir de" />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-muted">
+              Até
+              <Input type="date" value={ate} min={de || undefined} onChange={(e) => setAte(e.target.value)} className="h-9 w-[150px]" aria-label="Vencimento até" />
+            </label>
+            {!periodoOk && <p className="w-full text-xs text-danger">Escolha as duas datas, com a inicial antes da final.</p>}
+          </>
+        )}
+        <p className="mr-auto self-center text-xs text-muted">{data ? `${data.length} apólice(s) no recorte` : " "}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!data?.length}
+          onClick={() => {
+            try {
+              exportarVencimentos(data ?? [], recorte.de, recorte.ate);
+            } catch {
+              toast.error("Não foi possível gerar a planilha.");
+            }
+          }}
+        >
+          <Download /> Exportar planilha
+        </Button>
+      </div>
+      <div className="mt-3 flex-1">
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
@@ -144,14 +215,20 @@ function Expiring() {
             ))}
           </div>
         ) : !data?.length ? (
-          <EmptyState icon={<ShieldCheck />} title="Nada vencendo" description={`Nenhuma apólice vence nos próximos ${days} dias.`} />
+          <EmptyState icon={<ShieldCheck />} title="Nada vencendo" description={vazio} />
         ) : (
           <ul className="scrollbar-thin max-h-[392px] divide-y divide-border overflow-y-auto">
             {data.map((p, i) => (
               <motion.li key={p.id} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i, 10) * 0.025 }} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-2">
-                <div className={cn("grid w-14 shrink-0 place-items-center rounded-xl border py-1.5 text-center", p.diasRestantes <= 7 ? "border-danger/30 bg-danger-soft text-danger" : p.diasRestantes <= 15 ? "border-warning/30 bg-warning-soft text-warning" : "border-border bg-sunken text-foreground")}>
-                  <span className="font-display text-xl font-bold leading-none tabular">{p.diasRestantes}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{p.diasRestantes === 1 ? "dia" : "dias"}</span>
+                <div
+                  className={cn(
+                    "grid w-14 shrink-0 place-items-center rounded-xl border py-1.5 text-center",
+                    p.diasRestantes < 0 ? "border-border bg-sunken text-muted" : p.diasRestantes <= 7 ? "border-danger/30 bg-danger-soft text-danger" : p.diasRestantes <= 15 ? "border-warning/30 bg-warning-soft text-warning" : "border-border bg-sunken text-foreground",
+                  )}
+                  title={p.diasRestantes < 0 ? `Venceu há ${-p.diasRestantes} dia(s)` : undefined}
+                >
+                  <span className="font-display text-xl font-bold leading-none tabular">{Math.abs(p.diasRestantes)}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{p.diasRestantes < 0 ? "atrás" : p.diasRestantes === 1 ? "dia" : "dias"}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <Link href={`/app/clientes/${p.clientId}`} className="block truncate text-sm font-semibold hover:text-accent-text">
@@ -162,6 +239,7 @@ function Expiring() {
                     <span>{p.seguradora}</span>
                     <span className="hidden tabular sm:inline">nº {p.numero}</span>
                     {p.item?.placa && <span className="rounded bg-sunken px-1.5 font-mono text-[11px] font-semibold text-foreground">{p.item.placa}</span>}
+                    {p.sinistros > 0 && <span className="font-semibold text-warning">{p.sinistros} sinistro(s)</span>}
                   </p>
                 </div>
                 <div className="hidden text-right sm:block">

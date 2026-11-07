@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { CpfCnpjSchema, IsoDateSchema, PaginationQuerySchema, PlacaSchema, TelefoneSchema } from "./common";
 import {
+  ClaimStatusSchema,
   ClientStatusSchema,
   DocumentTipoSchema,
   FormaPagamentoSchema,
@@ -371,9 +372,15 @@ export const QuoteListQuerySchema = PaginationQuerySchema.extend({
 });
 
 // ---------------------------------------------------------------- dashboard
-export const ExpiringQuerySchema = z.object({
-  days: z.coerce.number().int().refine((d) => [7, 15, 30, 60].includes(d), "days deve ser 7, 15, 30 ou 60").default(30),
-});
+export const ExpiringQuerySchema = z
+  .object({
+    days: z.coerce.number().int().refine((d) => [7, 15, 30, 60].includes(d), "days deve ser 7, 15, 30 ou 60").default(30),
+    /** Período personalizado (inclusive). Quando vier, substitui `days`. */
+    de: IsoDateSchema.optional(),
+    ate: IsoDateSchema.optional(),
+  })
+  .refine((v) => !v.de === !v.ate, "Informe as duas datas do período")
+  .refine((v) => !v.de || !v.ate || v.de <= v.ate, "A data inicial deve ser antes da final");
 export const InstallmentsDueQuerySchema = z.object({ range: z.enum(["today", "week"]).default("today") });
 export const BirthdaysQuerySchema = z.object({ scope: z.enum(["today", "month"]).default("today") });
 
@@ -398,3 +405,25 @@ export const PublicLeadSchema = z.object({
   site: z.string().max(0).optional(),
 });
 export type PublicLeadInput = z.infer<typeof PublicLeadSchema>;
+
+// ---------------------------------------------------------------- sinistros
+export const ClaimCreateSchema = z.object({
+  clientId: z.string().min(1, "Escolha o cliente"),
+  policyId: z.string().min(1, "Escolha a apólice"),
+  dataOcorrencia: IsoDateSchema,
+  tipo: z.string().trim().min(2, "Informe o tipo").max(80),
+  descricao: z.string().trim().min(3, "Descreva o que aconteceu").max(4000),
+  local: optStr(200),
+  protocolo: optStr(80),
+  valor: z.coerce.number().min(0).max(100_000_000).optional().nullable(),
+  status: ClaimStatusSchema.default("ABERTO"),
+});
+export type ClaimCreateInput = z.infer<typeof ClaimCreateSchema>;
+export const ClaimUpdateSchema = ClaimCreateSchema.omit({ clientId: true }).partial();
+export type ClaimUpdateInput = z.infer<typeof ClaimUpdateSchema>;
+export const ClaimListQuerySchema = PaginationQuerySchema.extend({
+  clientId: z.string().optional(),
+  policyId: z.string().optional(),
+  status: ClaimStatusSchema.optional(),
+  q: z.string().trim().max(120).optional(),
+});

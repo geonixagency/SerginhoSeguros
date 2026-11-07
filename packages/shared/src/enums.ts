@@ -58,3 +58,9 @@ export type ConnectorCapability = z.infer<typeof ConnectorCapabilitySchema>;
 /** Variáveis aceitas nos templates de mensagem. */
 export const TEMPLATE_VARIABLES = ["nome", "seguradora", "apolice", "valor", "vencimento", "placa"] as const;
 export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number];
+
+export const ClaimStatusSchema = z.enum(["ABERTO", "EM_ANALISE", "INDENIZADO", "NEGADO", "ENCERRADO"]);
+export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
+
+/** Tipos sugeridos de sinistro (o campo aceita texto livre). */
+export const CLAIM_TIPOS = ["Colisão", "Roubo/Furto", "Vidros", "Danos a terceiros", "Incêndio", "Fenômenos naturais", "Danos elétricos", "Assistência 24h", "Outros"] as const;

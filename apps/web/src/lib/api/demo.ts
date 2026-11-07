@@ -20,6 +20,8 @@ import type {
   DashboardCharts,
   DashboardSummary,
   ExpiringPolicy,
+  Claim,
+  ClaimInput,
   Installment,
   InstallmentsDue,
   Lead,
@@ -207,11 +209,79 @@ route("GET", "/dashboard/summary", ({ d }): DashboardSummary => {
 });
 route("GET", "/dashboard/expiring", ({ d, query }): ExpiringPolicy[] => {
   const days = Number(query.get("days") ?? 30);
+  const de = query.get("de");
+  const ate = query.get("ate");
+  const claims = d.claims ?? [];
   return d.policies
-    .filter((p) => p.status === "VIGENTE")
-    .map((p) => ({ ...p, diasRestantes: daysUntil(p.fimVigencia), telefone: d.clients.find((c) => c.id === p.clientId)?.telefone ?? "" }))
-    .filter((p) => p.diasRestantes >= 0 && p.diasRestantes <= days)
-    .sort((a, b) => a.diasRestantes - b.diasRestantes);
+    .filter((p) => (de && ate ? p.status !== "CANCELADA" && p.fimVigencia >= de && p.fimVigencia <= ate : p.status === "VIGENTE"))
+    .map((p) => {
+      const c = d.clients.find((x) => x.id === p.clientId);
+      return {
+        ...p,
+        diasRestantes: daysUntil(p.fimVigencia),
+        telefone: c?.telefone ?? "",
+        cpfCnpj: c?.cpfCnpj ?? "",
+        placas: p.item?.placa ? [p.item.placa] : [],
+        sinistros: claims.filter((x) => x.policyId === p.id).length,
+      };
+    })
+    .filter((p) => (de && ate) || (p.diasRestantes >= 0 && p.diasRestantes <= days))
+    .sort((a, b) => a.fimVigencia.localeCompare(b.fimVigencia) || a.clientNome.localeCompare(b.clientNome));
+});
+
+// ---------------- sinistros
+function claimOf(d: DemoDB, body: Partial<ClaimInput>, base?: Claim): Claim {
+  const policyId = body.policyId ?? base?.policyId ?? "";
+  const p = d.policies.find((x) => x.id === policyId);
+  const clientId = base?.clientId ?? body.clientId ?? "";
+  if (!p) throw new DemoHttpError(404, "Apólice não encontrada");
+  if (p.clientId !== clientId) throw new DemoHttpError(400, "A apólice escolhida não é deste cliente");
+  return {
+    id: base?.id ?? `sin-${Date.now()}`,
+    clientId,
+    clientNome: d.clients.find((c) => c.id === clientId)?.nome ?? "",
+    policyId,
+    policyNumero: p.numero,
+    ramo: p.ramo,
+    seguradora: p.seguradora,
+    placa: p.item?.placa ?? null,
+    dataOcorrencia: body.dataOcorrencia ?? base?.dataOcorrencia ?? "",
+    tipo: body.tipo ?? base?.tipo ?? "",
+    descricao: body.descricao ?? base?.descricao ?? "",
+    local: body.local !== undefined ? body.local ?? null : base?.local ?? null,
+    protocolo: body.protocolo !== undefined ? body.protocolo ?? null : base?.protocolo ?? null,
+    valor: body.valor !== undefined ? (body.valor == null ? null : Number(body.valor).toFixed(2)) : base?.valor ?? null,
+    status: body.status ?? base?.status ?? "ABERTO",
+    createdAt: base?.createdAt ?? now(),
+    updatedAt: now(),
+  };
+}
+route("GET", "/claims", ({ d, query }) => {
+  const clientId = query.get("clientId");
+  const status = query.get("status");
+  const q = query.get("q");
+  const page = Number(query.get("page") ?? 1);
+  const pageSize = Number(query.get("pageSize") ?? 20);
+  const all = (d.claims ?? [])
+    .filter((c) => (!clientId || c.clientId === clientId) && (!status || c.status === status) && (!q || norm(c.clientNome).includes(norm(q))))
+    .sort((a, b) => b.dataOcorrencia.localeCompare(a.dataOcorrencia));
+  return { data: all.slice((page - 1) * pageSize, page * pageSize), total: all.length, page, pageSize };
+});
+route("POST", "/claims", ({ d, body }) => {
+  const c = claimOf(d, body as ClaimInput);
+  (d.claims ??= []).unshift(c);
+  return c;
+});
+route("PATCH", "/claims/:id", ({ d, params, body }) => {
+  const list = (d.claims ??= []);
+  const i = list.findIndex((c) => c.id === params.id);
+  if (i < 0) throw new DemoHttpError(404, "Sinistro não encontrado");
+  list[i] = claimOf(d, body as Partial<ClaimInput>, list[i]);
+  return list[i];
+});
+route("DELETE", "/claims/:id", ({ d, params }) => {
+  d.claims = (d.claims ?? []).filter((c) => c.id !== params.id);
+  return null;
 });
 route("GET", "/dashboard/installments-due", ({ d }): InstallmentsDue => {
   const open = d.installments.filter((i) => i.status === "PENDENTE" || i.status === "ATRASADO");

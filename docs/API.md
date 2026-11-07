@@ -62,6 +62,9 @@ Regras iguais às de `scripts/import`: cliente por CPF/CNPJ (só completa campos
 |---|---|
 | `GET /dashboard/summary` | `DashboardSummaryDTO`: clientes ativos e inativos, novos no mês, apólices vigentes, prêmio da carteira, parcelas atrasadas, `vencendo{d7,d15,d30,d60}` e `alertas[]`. |
 | `GET /dashboard/expiring?days=7\|15\|30\|60` | `{ days, total, data: ExpiringPolicyDTO[] }` |
+| `GET /dashboard/expiring?de=aaaa-mm-dd&ate=aaaa-mm-dd` | período personalizado (inclusive, até 5.000 apólices); cada item traz `client.cpfCnpj`, `placas` e `sinistros` |
+| `GET /claims?clientId&policyId&status&q&page&pageSize` | sinistros paginados (`ClaimDTO`) |
+| `POST /claims` · `PATCH /claims/:id` · `DELETE /claims/:id` | registra (cliente + apólice do mesmo cliente + data, tipo, descrição), atualiza ou remove sinistro |
 | `GET /dashboard/installments-due?range=today\|week` | `{ range, total, data: InstallmentWithContextDTO[] }` |
 | `GET /dashboard/charts` | `DashboardChartsDTO`: `porSeguradora`, `porRamo` e `novosPorMes` (últimos 12 meses). |
 | `GET /dashboard/birthdays?scope=today\|month` | `{ scope, data: BirthdayDTO[] }` |

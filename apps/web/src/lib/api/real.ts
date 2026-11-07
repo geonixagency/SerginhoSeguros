@@ -58,6 +58,10 @@ import type {
   DocumentFile,
   Endereco,
   ExpiringPolicy,
+  ExpiringFilter,
+  Claim,
+  ClaimInput,
+  ClaimsQuery,
   Installment,
   InstallmentsDue,
   Insurer,
@@ -648,6 +652,15 @@ export const realApi = {
     limpar: (confirmacao: string) =>
       http.post<{ clientes: number; apolices: number; documentos: number; pastasRemovidas: number }>("/import/limpar", { confirmacao }),
   },
+  claims: {
+    list: async (q: ClaimsQuery): Promise<Paginated<Claim>> => {
+      const r = await http.get<{ data: Claim[]; total: number; page: number; pageSize: number }>(`/claims${qs({ ...q })}`);
+      return { items: r.data, total: r.total, page: r.page, pageSize: r.pageSize };
+    },
+    create: (data: ClaimInput) => http.post<Claim>("/claims", data),
+    update: (id: string, data: Partial<Omit<ClaimInput, "clientId">>) => http.patch<Claim>(`/claims/${id}`, data),
+    remove: (id: string) => http.del<void>(`/claims/${id}`),
+  },
   dashboard: {
     summary: async (): Promise<DashboardSummary> => {
       const s = await http.get<DashboardSummaryDTO>("/dashboard/summary");
@@ -669,8 +682,8 @@ export const realApi = {
         alertas: s.alertas.map((a) => ({ id: a.tipo, nivel: a.nivel, titulo: a.mensagem, descricao: "", href: HREF[a.tipo] })),
       };
     },
-    expiring: async (days: number): Promise<ExpiringPolicy[]> => {
-      const r = await http.get<{ data: ExpiringPolicyDTO[] }>(`/dashboard/expiring${qs({ days })}`);
+    expiring: async (f: ExpiringFilter): Promise<ExpiringPolicy[]> => {
+      const r = await http.get<{ data: ExpiringPolicyDTO[] }>(`/dashboard/expiring${qs({ ...f })}`);
       return r.data.map((p) => ({
         id: p.id,
         clientId: p.client.id,
@@ -690,6 +703,9 @@ export const realApi = {
         documentId: null,
         diasRestantes: p.diasParaVencer,
         telefone: p.client.telefone ?? "",
+        cpfCnpj: p.client.cpfCnpj,
+        placas: p.placas,
+        sinistros: p.sinistros,
       }));
     },
     installmentsDue: async (): Promise<InstallmentsDue> => {

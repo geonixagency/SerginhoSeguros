@@ -22,6 +22,7 @@ import messagingRoutes from "./modules/messaging/routes";
 import leadRoutes from "./modules/leads/routes";
 import publicRoutes from "./modules/public/routes";
 import quoteRoutes from "./modules/quotes/routes";
+import claimRoutes from "./modules/claims/routes";
 import taskRoutes from "./modules/tasks/routes";
 import importRoutes from "./modules/importacao/routes";
 import { webhookRoutes } from "./modules/messaging/webhook";
@@ -93,6 +94,7 @@ export async function buildApp() {
         await priv.register(leadRoutes, { prefix: "/leads" });
         await priv.register(quoteRoutes, { prefix: "/quotes" });
         await priv.register(taskRoutes, { prefix: "/tasks" });
+        await priv.register(claimRoutes, { prefix: "/claims" });
         await priv.register(importRoutes, { prefix: "/import" });
       });
       // Webhook da Evolution: autenticado por token próprio, não por JWT.

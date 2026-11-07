@@ -3,6 +3,7 @@
  * Todos os nomes, CPFs, telefones e placas são INVENTADOS. Nenhum dado real de cliente.
  */
 import type {
+  Claim,
   Client,
   DocumentFile,
   FormaPagamento,
@@ -113,6 +114,8 @@ export interface DemoDB {
   pacing?: { intervaloMinSeg: number; intervaloMaxSeg: number; loteTamanho: number; lotePausaMin: number };
   /** Anexos de mensagem subidos no demo (id -> nome). */
   anexos?: Record<string, string>;
+  /** Sinistros registrados no demo. */
+  claims?: Claim[];
 }
 
 export const DEFAULT_RULE_TEXTS = {
