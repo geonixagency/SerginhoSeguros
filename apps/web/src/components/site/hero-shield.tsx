@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 type Node = { key: string; icon: LucideIcon; label: string; caption: string; x: number; y: number };
 
 const NODES: Node[] = [
-  { key: "auto", icon: Car, label: "Auto", caption: "Seu carro, protegido.", x: 64, y: 92 },
+  { key: "auto", icon: Car, label: "Auto", caption: "Seu veículo, protegido.", x: 64, y: 92 },
   { key: "casa", icon: Home, label: "Casa", caption: "Sua casa, protegida.", x: 336, y: 92 },
   { key: "familia", icon: HeartHandshake, label: "Família", caption: "Sua família, amparada.", x: 64, y: 308 },
   { key: "empresa", icon: Building2, label: "Empresa", caption: "Seu negócio, seguro.", x: 336, y: 308 },

@@ -57,7 +57,7 @@ const PRODUCTS: { ramo: Ramo; icon: typeof Car; title: string; text: string; poi
     ramo: "AUTO",
     icon: Car,
     title: "Seguro Auto",
-    text: "Comparamos as principais seguradoras para o seu perfil — e quando acontece algo, é com a gente que você fala, não com uma central.",
+    text: "Carro, moto, caminhão e outros veículos. Comparamos as principais seguradoras para o seu perfil — e quando acontece algo, é com a gente que você fala, não com uma central.",
     points: ["Colisão, roubo e terceiros", "Carro reserva e guincho 24h", "Renovação sem dor de cabeça"],
     span: "lg:col-span-7 lg:row-span-2",
   },
@@ -196,7 +196,7 @@ function Hero({ replay }: { replay: number }) {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="mb-6 inline-flex items-center gap-2 rounded-full border border-gold-500/40 bg-gold-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-gold-800 dark:border-gold-500/30 dark:bg-gold-400/5 dark:text-gold-300"
           >
-            <span className="size-1.5 rounded-full bg-gold-400" /> Corretora de seguros · há mais de 5 anos
+            <span className="size-1.5 rounded-full bg-gold-400" /> Corretora de seguros · há mais de 10 anos
           </motion.p>
           <FocusReveal
             as="h1"
@@ -243,10 +243,10 @@ function Hero({ replay }: { replay: number }) {
       <div className="relative border-t border-ink-950/10 bg-ivory-50/70 backdrop-blur-sm dark:border-white/10 dark:bg-ink-950/70">
         <dl className="mx-auto grid max-w-6xl grid-cols-2 divide-ink-950/10 px-4 dark:divide-white/10 sm:px-6 md:grid-cols-4 md:divide-x">
           {[
-            { v: 5, pre: "+", suf: " anos", l: "de corretagem" },
-            { v: 100, pre: "+", suf: "", l: "clientes satisfeitos" },
+            { v: 10, pre: "+", suf: " anos", l: "de mercado" },
+            { v: 500, pre: "+", suf: "", l: "clientes atendidos" },
             { v: 6, pre: "", suf: "", l: "linhas de proteção" },
-            { v: 10, pre: "+", suf: "", l: "seguradoras parceiras" },
+            { v: 20, pre: "+", suf: "", l: "seguradoras parceiras" },
           ].map((s, i) => (
             <div key={s.l} className="py-6 md:px-6 md:first:pl-0">
               <dt className="sr-only">{s.l}</dt>
@@ -393,7 +393,7 @@ function About() {
           <SectionTitle id="sobre-title" eyebrow="Quem somos" title="Uma corretora de família, para famílias e negócios." />
           <div className="mt-6 space-y-4 text-[15.5px] leading-relaxed text-muted">
             <p>
-              A Serginho Seguros nasceu do jeito mais simples: atender bem quem confia na gente. À frente da corretora, <strong className="text-foreground">Sergio e Viviani Rosalim</strong> somam mais de cinco anos cuidando de seguros de vida, auto, residência, empresas, imóveis e consórcios.
+              A Serginho Seguros nasceu do jeito mais simples: atender bem quem confia na gente. À frente da corretora, <strong className="text-foreground">Sergio e Viviani Rosalim</strong> somam mais de dez anos cuidando de seguros de vida, automóveis, residência, empresas, imóveis e consórcios.
             </p>
             <p>
               Não vendemos a apólice mais cara nem a mais barata — vendemos a certa. Comparamos as seguradoras, explicamos cada cobertura e ficamos disponíveis no WhatsApp para o que der e vier.
@@ -406,7 +406,7 @@ function About() {
             </div>
             <div>
               <dt className="text-xs font-bold uppercase tracking-[0.16em] text-subtle">Experiência</dt>
-              <dd className="mt-1 font-display text-2xl font-semibold">+5 anos no mercado</dd>
+              <dd className="mt-1 font-display text-2xl font-semibold">+10 anos no mercado</dd>
             </div>
           </dl>
         </motion.div>

@@ -21,7 +21,7 @@ const QUESTIONS: Question[] = [
     id: "alvo",
     title: "O que você mais quer proteger agora?",
     options: [
-      { id: "carro", label: "Meu carro ou moto", icon: Car, weights: { AUTO: 5 } },
+      { id: "carro", label: "Meu automóvel", hint: "Carro, moto, caminhão e outros veículos", icon: Car, weights: { AUTO: 5 } },
       { id: "casa", label: "Minha casa", icon: Home, weights: { RESIDENCIAL: 5 } },
       { id: "familia", label: "Minha família", icon: HeartHandshake, weights: { VIDA: 5 } },
       { id: "negocio", label: "Meu negócio", icon: Building2, weights: { EMPRESARIAL: 5 } },
@@ -33,7 +33,7 @@ const QUESTIONS: Question[] = [
     id: "momento",
     title: "Qual frase combina mais com o seu momento?",
     options: [
-      { id: "novo", label: "Acabei de comprar ou me mudar", hint: "Carro novo, casa nova, empresa nova", weights: { AUTO: 1, RESIDENCIAL: 2, EMPRESARIAL: 1 } },
+      { id: "novo", label: "Acabei de comprar ou me mudar", hint: "Veículo novo, casa nova, empresa nova", weights: { AUTO: 1, RESIDENCIAL: 2, EMPRESARIAL: 1 } },
       { id: "filhos", label: "Tenho gente que depende de mim", hint: "Filhos, cônjuge, pais", weights: { VIDA: 3, RESIDENCIAL: 1 } },
       { id: "economia", label: "Quero pagar menos no que já tenho", hint: "Revisar o seguro atual", weights: { AUTO: 2, EMPRESARIAL: 1 } },
       { id: "plano", label: "Estou planejando os próximos anos", hint: "Sem pressa, sem juros", weights: { CONSORCIO: 3, VIDA: 1 } },
