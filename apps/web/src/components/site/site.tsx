@@ -383,9 +383,9 @@ function About() {
           </div>
           <div className="absolute -bottom-5 -right-3 rounded-2xl border border-border bg-surface px-5 py-4 shadow-[var(--shadow-lift)] sm:-right-6">
             <p className="font-display text-3xl font-bold text-accent-text">
-              +<CountUp value={100} />
+              +<CountUp value={500} />
             </p>
-            <p className="text-xs font-semibold text-muted">clientes satisfeitos</p>
+            <p className="text-xs font-semibold text-muted">clientes atendidos</p>
           </div>
         </motion.div>
 
