@@ -75,7 +75,7 @@ function ClientsInner() {
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex.: Juliana, 123.456, RTA4E21, POR553…" className="pl-9 pr-9" aria-label="Buscar clientes" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex.: Nome, 123.456, RTA4E21, POR553…" className="pl-9 pr-9" aria-label="Buscar clientes" />
             {q && (
               <button onClick={() => setQ("")} className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted hover:bg-sunken" aria-label="Limpar busca">
                 <X className="size-4" />
