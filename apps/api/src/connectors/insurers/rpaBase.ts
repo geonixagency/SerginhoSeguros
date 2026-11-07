@@ -6,7 +6,8 @@
 // "Renovar sessão" (rota dedicada), nunca em silêncio aqui.
 import type { InstallmentStatus } from "@ss/shared";
 import { ConnectorError, type Credential, type PolicyStatusDTO, type ConnectorInstallmentDTO } from "../types";
-import { loginFromCredential, RobotCallError, type PortalRobotClient, type RobotInsurerCode, type RobotInstallment, type RobotSessionResult, type RobotSessionStatus } from "../portalRobot";
+import { prisma } from "../../lib/prisma";
+import { loginFromCredential, RobotCallError, slugsForRobotCode, type PortalRobotClient, type RobotInsurerCode, type RobotInstallment, type RobotSessionResult, type RobotSessionStatus } from "../portalRobot";
 
 /**
  * A sessão do portal não pôde ser restabelecida automaticamente (captcha/2FA, credencial
@@ -36,7 +37,12 @@ export async function withSession<T>(robot: PortalRobotClient, insurer: RobotIns
     if (!(err instanceof RobotCallError) || err.code !== "SESSION_EXPIRED") throw err;
   }
   const r = await robot.login(insurer, loginFromCredential(cred));
-  if (r.status !== "valid") throw new RobotSessionError(r.status, testFromSession(r).detalhe ?? "Sessão do portal indisponível");
+  if (r.status !== "valid") {
+    const detalhe = testFromSession(r).detalhe ?? "Sessão do portal indisponível";
+    // Senha recusada no login automático: marca o acesso para aparecer em Configurações > Acessos.
+    if (r.status === "invalid_credentials") await markAccessRejected(insurer, detalhe).catch(() => undefined);
+    throw new RobotSessionError(r.status, detalhe);
+  }
   return op();
 }
 
@@ -129,4 +135,13 @@ export function requireCpf(cpfCnpj: string | null | undefined, portal: string): 
 export function ensureCredential(cred: Credential | null | undefined, portal: string): Credential {
   if (!cred) throw new ConnectorError(`Cadastre a credencial do portal da ${portal} (usuário e senha) antes de usar o robô.`);
   return cred;
+}
+
+/** Registra no cofre que o portal recusou o acesso (usuário/senha desatualizados). */
+export async function markAccessRejected(code: RobotInsurerCode, detalhe: string): Promise<void> {
+  const insurers = await prisma.insurer.findMany({ where: { slug: { in: slugsForRobotCode(code) } }, select: { id: true } });
+  const ids = insurers.map((i) => i.id);
+  if (!ids.length) return;
+  await prisma.insurerCredential.updateMany({ where: { insurerId: { in: ids } }, data: { ultimoTeste: new Date(), ultimoErro: detalhe } });
+  await prisma.insurer.updateMany({ where: { id: { in: ids } }, data: { statusIntegracao: "ERRO" } });
 }

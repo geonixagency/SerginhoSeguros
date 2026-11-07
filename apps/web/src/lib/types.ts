@@ -212,6 +212,32 @@ export interface InsurerCredential {
   ultimoTeste: ISODate | null;
   ultimoErro: string | null;
 }
+/** Configurações > Acessos dos portais: estado do acesso de cada plataforma (nunca traz senha). */
+export interface PortalAccess {
+  insurerId: string;
+  nome: string;
+  slug: string;
+  categoria: "SEGURADORA" | "PLATAFORMA";
+  portalUrl: string | null;
+  ativo: boolean;
+  /** O robô entra neste portal com o acesso cadastrado. */
+  usaRobo: boolean;
+  canal: string;
+  statusIntegracao: string;
+  credencial: {
+    tipo: string;
+    /** Campo -> valor mascarado (senha sempre "••••••••"). */
+    campos: Record<string, string>;
+    atualizadoEm: ISODate;
+    ultimoTeste: ISODate | null;
+    ultimoErro: string | null;
+  } | null;
+}
+export interface PatchCredentialInput {
+  /** Só os campos que mudaram; vazio = mantém o valor atual. */
+  valores: Record<string, string>;
+  remover?: string[];
+}
 export interface TestConnectionResult {
   ok: boolean;
   detalhe?: string;

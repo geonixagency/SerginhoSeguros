@@ -103,11 +103,13 @@ export interface PortoFilters {
 }
 
 /** Slug do catálogo -> sessão do robô. Azul e Itaú ficam na plataforma (e na sessão) da Porto. */
+const ROBOT_SLUGS: Record<RobotInsurerCode, string[]> = { tokio: ["tokio-marine"], porto: ["porto", "azul", "itau"] };
 export function robotCodeForSlug(slug: string): RobotInsurerCode | null {
-  if (slug === "tokio-marine") return "tokio";
-  if (slug === "porto" || slug === "azul" || slug === "itau") return "porto";
+  for (const [code, slugs] of Object.entries(ROBOT_SLUGS)) if (slugs.includes(slug)) return code as RobotInsurerCode;
   return null;
 }
+/** Seguradoras (slugs) atendidas por um código do robô (Porto, Azul e Itaú compartilham o portal). */
+export const slugsForRobotCode = (code: RobotInsurerCode): string[] => ROBOT_SLUGS[code] ?? [];
 
 /** Credencial de portal esperada no cofre para o canal rpa. */
 export interface PortalLogin {

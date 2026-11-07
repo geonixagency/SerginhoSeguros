@@ -1,6 +1,8 @@
 import { http, qs, fetchFileUrl, IS_DEMO } from "./client";
 import { realApi } from "./real";
 import type {
+  PortalAccess,
+  PatchCredentialInput,
   ActionId,
   ActionResult,
   AuthResponse,
@@ -153,6 +155,8 @@ const demoApi = {
   },
   installments: { list: (status?: string) => http.get<Installment[]>(`/installments${qs({ status })}`) },
   insurers: {
+    acessos: () => http.get<PortalAccess[]>("/insurers/acessos"),
+    patchCredential: (id: string, data: PatchCredentialInput) => http.patch<{ ok: boolean }>(`/insurers/${id}/credentials`, data),
     list: () => http.get<Insurer[]>("/insurers"),
     get: (id: string) => http.get<Insurer>(`/insurers/${id}`),
     credentials: (id: string) => http.get<InsurerCredential[]>(`/insurers/${id}/credentials`),

@@ -112,6 +112,8 @@ O status ATIVO/INATIVO do cliente é recalculado a cada alteração e também em
 | GET | `/insurers/:id` | Detalhe de uma seguradora. |
 | PATCH | `/insurers/:id` **[ADMIN]** | `InsurerUpdateSchema` (nome, ramos, portalUrl, temApi, ativo...). |
 | PUT | `/insurers/:id/credentials` **[ADMIN]** | `{ tipo, valores: {campo: segredo}, ambiente }`. Os segredos são cifrados com AES-256-GCM e a API só devolve a máscara. |
+| GET | `/insurers/acessos` **[ADMIN]** | Tela Configurações > Acessos dos portais: `{ data: PortalAccessDTO[] }` com `usaRobo`, `statusIntegracao` e `credencial { campos (mascarados; senha sempre `••••••••`), atualizadoEm, ultimoTeste, ultimoErro }`. Nunca devolve segredo.
+| PATCH | `/insurers/:id/credentials` **[ADMIN]** | `{ valores: {campo: novoValor}, remover?: [campo] }`. Troca só os campos enviados (ex.: senha nova) e mantém os demais cifrados; valores vazios são ignorados. Limpa `ultimoErro`. Quando o robô recebe `invalid_credentials` no login, o acesso é marcado com `ultimoErro` e `statusIntegracao: ERRO` para a equipe atualizar a senha.
 | DELETE | `/insurers/:id/credentials` **[ADMIN]** | Remove a credencial. |
 | POST | `/insurers/:id/test` | `{ ok, detalhe, duracaoMs }`; o resultado também atualiza `statusIntegracao`. |
 | GET | `/insurers/:id/robot-session` | Só seguradoras de `canal: "rpa"` (Porto, Tokio, Azul, Itaú). Status da sessão do robô no portal: `{ insurer, status, detalhe?, headful?, vncUrl?, verificadoEm }`, com `status` ∈ `valid \| expired \| needs_human \| invalid_credentials \| error`. |

@@ -41,6 +41,8 @@ import type {
 } from "@ss/shared";
 import { http, qs, fetchFileUrl } from "./client";
 import type {
+  PortalAccess,
+  PatchCredentialInput,
   ActionId,
   ActionResult,
   AuthResponse,
@@ -853,6 +855,8 @@ export const realApi = {
       (await http.get<ApiPage<InstallmentWithContextDTO>>(`/installments${qs({ status, pageSize: 200 })}`)).data.map(installmentCtx),
   },
   insurers: {
+    acessos: async (): Promise<PortalAccess[]> => unwrap(await http.get<PortalAccess[] | { data: PortalAccess[] }>("/insurers/acessos")),
+    patchCredential: (id: string, data: PatchCredentialInput) => http.patch<unknown>(`/insurers/${id}/credentials`, data).then(() => ({ ok: true })),
     list: async (): Promise<Insurer[]> =>
       unwrap(await http.get<InsurerDTO[] | { data: InsurerDTO[] }>("/insurers"))
         .map(insurer)

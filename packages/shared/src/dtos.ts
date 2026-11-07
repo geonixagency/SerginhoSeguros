@@ -497,3 +497,25 @@ export interface ClaimDTO {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------- acessos dos portais
+/** Linha da aba Configurações > Acessos dos portais (nunca traz senha, só máscara). */
+export interface PortalAccessDTO {
+  insurerId: string;
+  nome: string;
+  slug: string;
+  categoria: "SEGURADORA" | "PLATAFORMA";
+  portalUrl: string | null;
+  ativo: boolean;
+  /** O robô entra neste portal com o acesso cadastrado. */
+  usaRobo: boolean;
+  canal: string;
+  statusIntegracao: StatusIntegracao;
+  credencial: {
+    tipo: string;
+    campos: Record<string, string>;
+    atualizadoEm: string;
+    ultimoTeste: string | null;
+    ultimoErro: string | null;
+  } | null;
+}

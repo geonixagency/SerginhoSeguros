@@ -215,13 +215,25 @@ export const InsurerUpdateSchema = z.object({
 
 /** Credenciais: pares chave/valor livres (ex.: clientId, clientSecret, apiKey, usuarioApi). */
 export const InsurerCredentialSchema = z.object({
-  tipo: z.enum(["API_KEY", "OAUTH_CLIENT", "TOKEN", "USUARIO_SENHA_API", "CERTIFICADO"]),
+  tipo: z.enum(["API_KEY", "OAUTH_CLIENT", "TOKEN", "USUARIO_SENHA_API", "CERTIFICADO", "PORTAL"]),
   valores: z
     .record(z.string().min(1).max(60), z.string().min(1).max(8000))
     .refine((v) => Object.keys(v).length > 0 && Object.keys(v).length <= 10, "Informe de 1 a 10 campos"),
   ambiente: z.enum(["PRODUCAO", "HOMOLOGACAO"]).default("PRODUCAO"),
 });
 export type InsurerCredentialInput = z.infer<typeof InsurerCredentialSchema>;
+
+/**
+ * PATCH /insurers/:id/credentials — atualiza só os campos enviados (ex.: trocar a senha
+ * sem redigitar o usuário). Campo com string vazia é ignorado; `remover` apaga campos.
+ */
+export const InsurerCredentialPatchSchema = z
+  .object({
+    valores: z.record(z.string().min(1).max(60), z.string().max(8000)).default({}),
+    remover: z.array(z.string().min(1).max(60)).max(10).optional(),
+  })
+  .refine((v) => Object.values(v.valores).some((x) => x.trim().length > 0) || (v.remover?.length ?? 0) > 0, "Nada para atualizar");
+export type InsurerCredentialPatchInput = z.infer<typeof InsurerCredentialPatchSchema>;
 
 // ---------------------------------------------------------------- ações por API
 export const ClientActionSchema = z.object({

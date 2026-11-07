@@ -2,17 +2,24 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Insurer, InsurerCredential, Prisma } from "@prisma/client";
-import { InsurerCredentialSchema, InsurerUpdateSchema, type InsurerCredentialMaskedDTO, type InsurerDTO } from "@ss/shared";
+import { InsurerCredentialPatchSchema, InsurerCredentialSchema, InsurerUpdateSchema, type InsurerCredentialMaskedDTO, type InsurerDTO, type PortalAccessDTO } from "@ss/shared";
 import { prisma } from "../../lib/prisma";
 import { parse } from "../../lib/validate";
 import { audit } from "../../lib/audit";
-import { encryptSecret } from "../../lib/secrets";
+import { decryptSecret, encryptSecret } from "../../lib/secrets";
 import { maskSecret } from "../../lib/crypto";
 import { badRequest, notFound } from "../../lib/errors";
 import { connectorChannel, getConnector, loadCredential } from "../../connectors/registry";
 import { loginFromCredential, portalRobot, robotCodeForSlug as robotCodeFor } from "../../connectors/portalRobot";
 
 const IdParams = z.object({ id: z.string().min(1) });
+
+/** Senhas e segredos nunca mostram pontas; usuário/login mostra as pontas para conferência. */
+const SEGREDOS = /senha|password|secret|token|apikey|chave/i;
+export function maskField(k: string, v: string): string {
+  return SEGREDOS.test(k) ? `${"•".repeat(8)}` : maskSecret(v);
+}
+const maskAll = (valores: Record<string, string>) => Object.fromEntries(Object.entries(valores).map(([k, v]) => [k, maskField(k, v)]));
 
 function credentialDTO(c: InsurerCredential | null): InsurerCredentialMaskedDTO | null {
   if (!c) return null;
@@ -80,7 +87,7 @@ export default async function insurerRoutes(app: FastifyInstance) {
     const input = parse(InsurerCredentialSchema, req.body);
     const insurer = await prisma.insurer.findUnique({ where: { id } });
     if (!insurer) throw notFound("Seguradora");
-    const mascara = Object.fromEntries(Object.entries(input.valores).map(([k, v]) => [k, maskSecret(v)]));
+    const mascara = maskAll(input.valores);
     const data = {
       tipo: input.tipo,
       ambiente: input.ambiente,
@@ -92,6 +99,61 @@ export default async function insurerRoutes(app: FastifyInstance) {
     await prisma.insurer.update({ where: { id }, data: { statusIntegracao: "CONFIGURADA" } });
     // Auditoria registra QUEM trocou e quais campos — nunca os valores.
     await audit(req, "CREDENCIAL_ATUALIZADA", "Insurer", id, null, { tipo: input.tipo, campos: Object.keys(input.valores) });
+    return credentialDTO(cred);
+  });
+
+  // Configurações > Acessos dos portais: todas as plataformas com o estado do acesso (sem segredos).
+  app.get("/acessos", { onRequest: [app.requireRole("ADMIN")] }, async (): Promise<{ data: PortalAccessDTO[] }> => {
+    const rows = await prisma.insurer.findMany({ include: { credential: true }, orderBy: [{ categoria: "asc" }, { nome: "asc" }] });
+    return {
+      data: rows.map((i) => ({
+        insurerId: i.id,
+        nome: i.nome,
+        slug: i.slug,
+        categoria: i.categoria,
+        portalUrl: i.portalUrl,
+        ativo: i.ativo,
+        usaRobo: robotCodeFor(i.slug) !== null,
+        canal: connectorChannel(i.slug),
+        statusIntegracao: i.statusIntegracao,
+        credencial: i.credential
+          ? {
+              tipo: i.credential.tipo,
+              campos: i.credential.mascara as Record<string, string>,
+              atualizadoEm: i.credential.updatedAt.toISOString(),
+              ultimoTeste: i.credential.ultimoTeste?.toISOString() ?? null,
+              ultimoErro: i.credential.ultimoErro,
+            }
+          : null,
+      })),
+    };
+  });
+
+  // Troca só os campos enviados (ex.: senha nova), mantendo os demais já cifrados.
+  app.patch("/:id/credentials", { onRequest: [app.requireRole("ADMIN")] }, async (req) => {
+    const { id } = parse(IdParams, req.params);
+    const input = parse(InsurerCredentialPatchSchema, req.body);
+    const insurer = await prisma.insurer.findUnique({ where: { id }, include: { credential: true } });
+    if (!insurer) throw notFound("Seguradora");
+    const atuais = insurer.credential ? (JSON.parse(decryptSecret(insurer.credential.segredoCriptografado)) as Record<string, string>) : {};
+    const novos: Record<string, string> = {};
+    for (const [k, v] of Object.entries(input.valores)) if (v && v.trim()) novos[k] = v.trim();
+    const valores: Record<string, string> = { ...atuais, ...novos };
+    for (const k of input.remover ?? []) delete valores[k];
+    if (!Object.keys(valores).length) throw badRequest("Informe ao menos um campo do acesso");
+    if (Object.keys(valores).length > 10) throw badRequest("No máximo 10 campos por acesso");
+    const data = {
+      tipo: insurer.credential?.tipo ?? "PORTAL",
+      ambiente: insurer.credential?.ambiente ?? "PRODUCAO",
+      segredoCriptografado: encryptSecret(JSON.stringify(valores)),
+      mascara: maskAll(valores),
+      ultimoErro: null,
+      ultimoTeste: null,
+    };
+    const cred = await prisma.insurerCredential.upsert({ where: { insurerId: id }, create: { insurerId: id, ...data }, update: data });
+    await prisma.insurer.update({ where: { id }, data: { statusIntegracao: "CONFIGURADA" } });
+    // Só os nomes dos campos vão para a auditoria, nunca os valores.
+    await audit(req, "CREDENCIAL_ATUALIZADA", "Insurer", id, null, { campos: Object.keys(novos), removidos: input.remover ?? [] });
     return credentialDTO(cred);
   });
 

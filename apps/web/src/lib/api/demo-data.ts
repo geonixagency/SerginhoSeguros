@@ -309,11 +309,19 @@ export function buildDemoDB(): DemoDB {
   // credenciais (mascaradas)
   const credentials: InsurerCredential[] = insurers
     .filter((i) => i.temApi && i.statusIntegracao !== "NAO_CONFIGURADA")
-    .flatMap((i) => [
+    .flatMap((i) =>
+      i.canal === "rpa"
+        ? [
+            // Portais do robô: login de corretor (usuário e senha), como em produção.
+            { id: `cred-${i.slug}-u`, insurerId: i.id, tipo: "PORTAL", rotulo: "usuario", valorMascarado: `co••••${between(10, 99)}`, ultimoTeste: i.statusIntegracao === "ERRO" ? iso(today - DAY) : i.ultimoTeste, ultimoErro: i.statusIntegracao === "ERRO" ? "Senha recusada pelo portal. Atualize a senha deste acesso." : null },
+            { id: `cred-${i.slug}-s`, insurerId: i.id, tipo: "PORTAL", rotulo: "senha", valorMascarado: "••••••••", ultimoTeste: i.ultimoTeste, ultimoErro: null },
+          ]
+        : [
       { id: `cred-${i.slug}-1`, insurerId: i.id, tipo: "CLIENT_ID", rotulo: "Client ID", valorMascarado: `${i.slug.slice(0, 3)}_••••••••${between(10, 99)}`, ultimoTeste: i.ultimoTeste, ultimoErro: i.statusIntegracao === "ERRO" ? "401 — token expirado em 03/11" : null },
       { id: `cred-${i.slug}-2`, insurerId: i.id, tipo: "CLIENT_SECRET", rotulo: "Client Secret", valorMascarado: "••••••••••••••••", ultimoTeste: i.ultimoTeste, ultimoErro: null },
       { id: `cred-${i.slug}-3`, insurerId: i.id, tipo: "CODIGO_CORRETOR", rotulo: "Código SUSEP / corretor", valorMascarado: `••••${between(100, 999)}`, ultimoTeste: i.ultimoTeste, ultimoErro: null },
-    ]);
+        ],
+    );
 
   // leads
   const stages: LeadStage[] = ["NOVO", "NOVO", "NOVO", "EM_CONTATO", "EM_CONTATO", "EM_CONTATO", "COTACAO_ENVIADA", "COTACAO_ENVIADA", "NEGOCIACAO", "NEGOCIACAO", "FECHADO", "FECHADO", "PERDIDO"];

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Download, Monitor, Moon, Palette, ShieldCheck, Sun } from "lucide-react";
 import { PageHeader } from "@/components/app/shell";
 import { ImportCarteira } from "@/components/app/import-carteira";
+import { PortalAccessCard } from "@/components/app/portal-access";
 import { ProfileCard } from "@/components/app/profile-card";
 import { TeamCard } from "@/components/app/team-card";
 import { Tabs, TabsContent } from "@/components/ui/overlays";
@@ -16,7 +17,8 @@ import { useAuth } from "@/lib/auth";
 import { IS_DEMO, API_BASE as API_BASE_LABEL } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
-const ABAS = ["geral", "perfil", "importar"] as const;
+const ABAS = ["geral", "perfil", "acessos", "importar"] as const;
+const SO_ADMIN: readonly Aba[] = ["acessos", "importar"];
 type Aba = (typeof ABAS)[number];
 
 export default function SettingsPage() {
@@ -33,12 +35,12 @@ function Settings() {
   const params = useSearchParams();
   const isAdmin = user?.perfil === "ADMIN";
   const pedida = params.get("aba") as Aba | null;
-  const aba: Aba = pedida && ABAS.includes(pedida) && (pedida !== "importar" || isAdmin) ? pedida : "geral";
+  const aba: Aba = pedida && ABAS.includes(pedida) && (!SO_ADMIN.includes(pedida) || isAdmin) ? pedida : "geral";
   const setAba = (v: string) => router.replace(v === "geral" ? "/app/configuracoes" : `/app/configuracoes?aba=${v}`, { scroll: false });
 
   return (
     <>
-      <PageHeader eyebrow="Sistema" title="Configurações" description="Seu perfil, equipe, aparência e privacidade." />
+      <PageHeader eyebrow="Sistema" title="Configurações" description="Seu perfil, equipe, acessos dos portais, aparência e privacidade." />
       <Tabs
         value={aba}
         onValueChange={setAba}
@@ -46,7 +48,7 @@ function Settings() {
         items={[
           { value: "geral", label: "Geral" },
           { value: "perfil", label: "Meu perfil" },
-          ...(isAdmin ? [{ value: "importar", label: "Importar carteira" }] : []),
+          ...(isAdmin ? [{ value: "acessos", label: "Acessos dos portais" }, { value: "importar", label: "Importar carteira" }] : []),
         ]}
       >
         <TabsContent value="geral" className="pt-5 outline-none">
@@ -55,6 +57,11 @@ function Settings() {
         <TabsContent value="perfil" className="pt-5 outline-none">
           <ProfileCard />
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="acessos" className="pt-5 outline-none">
+            <PortalAccessCard />
+          </TabsContent>
+        )}
         {isAdmin && (
           <TabsContent value="importar" className="pt-5 outline-none">
             <ImportCarteira />

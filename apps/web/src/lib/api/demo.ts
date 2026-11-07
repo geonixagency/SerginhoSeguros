@@ -598,6 +598,51 @@ route("GET", "/installments", ({ d, query }): Installment[] => {
 
 /* ---------------- seguradoras ---------------- */
 route("GET", "/insurers", ({ d }) => d.insurers);
+// Configurações > Acessos dos portais (como a API real: nunca devolve senha).
+route("GET", "/insurers/acessos", ({ d }) =>
+  d.insurers
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .map((i) => {
+      const creds = d.credentials.filter((c) => c.insurerId === i.id);
+      return {
+        insurerId: i.id,
+        nome: i.nome,
+        slug: i.slug,
+        categoria: "SEGURADORA" as const,
+        portalUrl: i.portalUrl || null,
+        ativo: true,
+        usaRobo: i.canal === "rpa",
+        canal: i.canal,
+        statusIntegracao: i.statusIntegracao,
+        credencial: creds.length
+          ? {
+              tipo: creds[0]!.tipo,
+              campos: Object.fromEntries(creds.map((c) => [c.rotulo, c.valorMascarado])),
+              atualizadoEm: creds[0]!.id.match(/-(\d{13})$/) ? new Date(Number(creds[0]!.id.slice(-13))).toISOString() : new Date(Date.now() - 95 * 86_400_000).toISOString(),
+              ultimoTeste: creds[0]!.ultimoTeste,
+              ultimoErro: creds.find((c) => c.ultimoErro)?.ultimoErro ?? null,
+            }
+          : null,
+      };
+    }),
+);
+route("PATCH", "/insurers/:id/credentials", ({ d, params, body }) => {
+  const b = body as { valores: Record<string, string>; remover?: string[] };
+  const ins = d.insurers.find((x) => x.id === params.id);
+  if (!ins) throw new DemoHttpError(404, "Seguradora não encontrada.");
+  const stamp = Date.now();
+  const atuais = d.credentials.filter((c) => c.insurerId === params.id && !(b.remover ?? []).includes(c.rotulo));
+  const novos = Object.entries(b.valores).filter(([, v]) => v.trim());
+  const keep = atuais.filter((c) => !novos.some(([k]) => k === c.rotulo));
+  const mask = (k: string, v: string) => (/senha|password|secret|token/i.test(k) ? "••••••••" : v.length > 4 ? v.slice(0, 2) + "••••" + v.slice(-2) : "••••");
+  d.credentials = [
+    ...d.credentials.filter((c) => c.insurerId !== params.id),
+    ...[...keep, ...novos.map(([k, v]) => ({ id: "", insurerId: params.id, tipo: "PORTAL", rotulo: k, valorMascarado: mask(k, v), ultimoTeste: null, ultimoErro: null }))].map((c, n) => ({ ...c, id: `cred-${c.rotulo}-${n}-${stamp}`, ultimoTeste: null, ultimoErro: null })),
+  ];
+  if (ins.statusIntegracao === "NAO_CONFIGURADA") ins.statusIntegracao = "MANUAL";
+  return { ok: true };
+});
 route("GET", "/insurers/:id", ({ d, params }) => {
   const i = d.insurers.find((x) => x.id === params.id);
   if (!i) throw new DemoHttpError(404, "Seguradora não encontrada.");
@@ -641,7 +686,13 @@ route("POST", "/insurers/:id/robot-session/renew", async ({ d, params }) => {
   if (!ins) throw new DemoHttpError(404, "Seguradora não encontrada.");
   if (ins.canal !== "rpa") throw new DemoHttpError(400, "Esta seguradora não usa o robô de portal.");
   ins.ultimoTeste = now();
-  if (ins.slug === "tokio") return { status: "needs_human" as const, detalhe: "Captcha/2FA no portal da Tokio. Conclua o login na janela do robô (noVNC).", headful: true, verificadoEm: now() };
+  const marcar = (erro: string | null) => d.credentials.forEach((c) => c.insurerId === ins.id && Object.assign(c, { ultimoTeste: now(), ultimoErro: erro }));
+  if (!d.credentials.some((c) => c.insurerId === ins.id)) throw new DemoHttpError(400, "Cadastre a credencial do portal (usuário e senha) antes de renovar a sessão");
+  if (ins.slug === "tokio") {
+    marcar("Captcha/2FA no portal da Tokio. Conclua o login na janela do robô.");
+    return { status: "needs_human" as const, detalhe: "Captcha/2FA no portal da Tokio. Conclua o login na janela do robô (noVNC).", headful: true, verificadoEm: now() };
+  }
+  marcar(null);
   ins.statusIntegracao = "CONECTADA";
   return { status: "valid" as const, detalhe: "Sessão renovada: login no portal concluído.", verificadoEm: now() };
 });
