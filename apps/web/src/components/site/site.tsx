@@ -478,14 +478,14 @@ function QuoteForm({ produto, setProduto }: { produto: Ramo; setProduto: (r: Ram
       <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
         <div>
           <p className="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.22em] text-gold-300">
-            <span className="h-px w-8 bg-gold-500" aria-hidden /> Cotação sem compromisso
+            <span className="h-px w-8 bg-gold-500" aria-hidden /> Cotação com qualidade e rapidez
           </p>
           <h2 id="cot-title" className="font-display text-4xl font-semibold leading-[1.02] sm:text-5xl">
             Conte o que você quer proteger. <span className="text-gold-gradient">A gente faz o resto.</span>
           </h2>
           <p className="mt-5 max-w-md text-[15.5px] leading-relaxed text-ivory-100/65">Respondemos no mesmo dia útil, pelo WhatsApp, com as opções comparadas lado a lado.</p>
           <ul className="mt-8 space-y-3 text-sm text-ivory-100/80">
-            {["Comparação entre várias seguradoras", "Explicação de cada cobertura, sem letra miúda", "Sem custo e sem compromisso"].map((t) => (
+            {["Comparação entre várias seguradoras", "Explicação de cada cobertura, sem letra miúda", "Retorno rápido pelo WhatsApp"].map((t) => (
               <li key={t} className="flex items-center gap-3">
                 <span className="grid size-6 place-items-center rounded-full bg-gold-400/15 text-gold-300">
                   <Check className="size-3.5" />
