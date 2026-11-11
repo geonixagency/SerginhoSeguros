@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { motion } from "motion/react";
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Trash2,
   CalendarDays,
   Car,
   FileText,
@@ -34,7 +36,7 @@ import { AttachDialog, ClientFormDialog, PolicyFormDialog } from "@/components/a
 import { SendWhatsAppDialog } from "@/components/app/send-whatsapp";
 import { Button } from "@/components/ui/button";
 import { Avatar, Badge, Card, EmptyState, ErrorState, Skeleton } from "@/components/ui/primitives";
-import { Tabs, TabsContent } from "@/components/ui/overlays";
+import { Dialog, DialogContent, Tabs, TabsContent } from "@/components/ui/overlays";
 import { ClientClaimsCard } from "@/components/app/claims";
 import { WhatsAppIcon } from "@/components/site/whatsapp-icon";
 import { api } from "@/lib/api";
@@ -82,7 +84,40 @@ function DadosTab({ c }: { c: ClientDetail }) {
   );
 }
 
-function ApolicesTab({ c, onNew, onEdit }: { c: ClientDetail; onNew: () => void; onEdit: (p: Policy) => void }) {
+function DeletePolicyDialog({ policy, clientId, onClose }: { policy: Policy | null; clientId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const remove = useMutation({
+    mutationFn: (id: string) => api.policies.remove(id),
+    onSuccess: () => {
+      toast.success("Apólice excluída");
+      void qc.invalidateQueries({ queryKey: ["client", clientId] });
+      void qc.invalidateQueries({ queryKey: ["clients"] });
+      void qc.invalidateQueries({ queryKey: ["claims"] });
+      void qc.invalidateQueries({ queryKey: ["dash"] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={!!policy} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        title="Excluir apólice?"
+        description={policy ? `A apólice ${policy.numero} (${policy.seguradora}) sai da ficha junto com as parcelas e os sinistros ligados a ela. Os documentos anexados continuam na aba Documentos. Não dá para desfazer.` : undefined}
+      >
+        <div className="flex justify-end gap-2 p-5 pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="danger" loading={remove.isPending} onClick={() => policy && remove.mutate(policy.id)}>
+            Excluir
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ApolicesTab({ c, onNew, onEdit, onDelete }: { c: ClientDetail; onNew: () => void; onEdit: (p: Policy) => void; onDelete: (p: Policy) => void }) {
   if (!c.apolices.length)
     return (
       <EmptyState
@@ -121,6 +156,9 @@ function ApolicesTab({ c, onNew, onEdit }: { c: ClientDetail; onNew: () => void;
                   <PolicyStatusBadge status={p.status} />
                   <Button variant="ghost" size="icon-sm" onClick={() => onEdit(p)} aria-label={`Editar apólice ${p.numero}`}>
                     <Pencil />
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" onClick={() => onDelete(p)} aria-label={`Excluir apólice ${p.numero}`}>
+                    <Trash2 />
                   </Button>
                 </div>
               </div>
@@ -343,6 +381,7 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
   const [attach, setAttach] = useState(false);
   /** undefined = fechado; null = nova apólice; Policy = editar. */
   const [polForm, setPolForm] = useState<Policy | null | undefined>(undefined);
+  const [polDel, setPolDel] = useState<Policy | null>(null);
   // Cadastro manual recém-criado: já abre a primeira apólice.
   useEffect(() => {
     if (search.get("novo") === "1") {
@@ -441,7 +480,7 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
             <DadosTab c={c} />
           </TabsContent>
           <TabsContent value="apolices">
-            <ApolicesTab c={c} onNew={() => setPolForm(null)} onEdit={(p) => setPolForm(p)} />
+            <ApolicesTab c={c} onNew={() => setPolForm(null)} onEdit={(p) => setPolForm(p)} onDelete={setPolDel} />
           </TabsContent>
           <TabsContent value="parcelas">
             <ParcelasTab c={c} />
@@ -463,6 +502,7 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
 
       <ClientFormDialog open={editing} onOpenChange={setEditing} client={c} />
       <PolicyFormDialog key={polForm === undefined ? "pol-closed" : `pol-${polForm?.id ?? "nova"}`} open={polForm !== undefined} onOpenChange={(o) => !o && setPolForm(undefined)} client={c} policy={polForm} />
+      <DeletePolicyDialog policy={polDel} clientId={c.id} onClose={() => setPolDel(null)} />
       <AttachDialog key={attach ? "att-open" : "att-closed"} open={attach} onOpenChange={setAttach} client={c} />
 
       <SendWhatsAppDialog

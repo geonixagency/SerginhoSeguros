@@ -152,6 +152,7 @@ const demoApi = {
     list: (clientId?: string) => http.get<Policy[]>(`/policies${qs({ clientId })}`),
     create: (data: PolicyInput) => http.post<Policy>("/policies", data),
     update: (id: string, data: PolicyInput) => http.patch<Policy>(`/policies/${id}`, data),
+    remove: (id: string) => http.del<void>(`/policies/${id}`),
   },
   installments: { list: (status?: string) => http.get<Installment[]>(`/installments${qs({ status })}`) },
   insurers: {

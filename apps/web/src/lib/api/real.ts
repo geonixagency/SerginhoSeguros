@@ -850,6 +850,7 @@ export const realApi = {
     },
     create: async (data: PolicyInput): Promise<Policy> => policy(await http.post<PolicyDetailDTO>("/policies", { clientId: data.clientId, ...policyBody(data) }), { id: data.clientId, nome: "" }),
     update: async (id: string, data: PolicyInput): Promise<Policy> => policy(await http.patch<PolicyDetailDTO>(`/policies/${id}`, policyBody(data)), { id: data.clientId, nome: "" }),
+    remove: (id: string) => http.del<void>(`/policies/${id}`),
   },
   installments: {
     list: async (status?: string): Promise<Installment[]> =>

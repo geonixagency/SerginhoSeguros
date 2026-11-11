@@ -132,6 +132,20 @@ export default async function policyRoutes(app: FastifyInstance) {
     return policyDetail(id);
   });
 
+  // Exclui a apólice com parcelas, itens e sinistros (cascade). Documentos e mensagens ficam, só perdem o vínculo.
+  app.delete("/policies/:id", async (req, reply) => {
+    const { id } = parse(IdParams, req.params);
+    const before = await prisma.policy.findUnique({ where: { id }, select: { id: true, clientId: true, numero: true, ramo: true, insurerId: true } });
+    if (!before) throw notFound("Apólice");
+    await prisma.$transaction([
+      prisma.task.updateMany({ where: { policyId: id }, data: { policyId: null } }),
+      prisma.policy.delete({ where: { id } }),
+    ]);
+    await refreshClientStatus(before.clientId);
+    await audit(req, "EXCLUIR", "Policy", id, before, null);
+    return reply.status(204).send();
+  });
+
   app.get("/installments", async (req) => {
     const q = parse(InstallmentListQuerySchema, req.query);
     const where: Prisma.InstallmentWhereInput = {

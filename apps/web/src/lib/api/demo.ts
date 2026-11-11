@@ -594,6 +594,13 @@ route("PATCH", "/policies/:id", ({ d, params, body }) => {
   if (!d.policies.some((p) => p.id === params.id)) throw new DemoHttpError(404, "Apólice não encontrada");
   return savePolicy(d, body as PolicyInput, params.id);
 });
+route("DELETE", "/policies/:id", ({ d, params }) => {
+  if (!d.policies.some((p) => p.id === params.id)) throw new DemoHttpError(404, "Apólice não encontrada");
+  d.policies = d.policies.filter((p) => p.id !== params.id);
+  d.installments = d.installments.filter((i) => i.policyId !== params.id);
+  d.claims = (d.claims ?? []).filter((c) => c.policyId !== params.id);
+  return null;
+});
 route("GET", "/installments", ({ d, query }): Installment[] => {
   const status = query.get("status");
   return d.installments.filter((i) => !status || i.status === status);
