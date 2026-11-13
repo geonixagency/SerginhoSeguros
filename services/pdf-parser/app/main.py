@@ -70,6 +70,7 @@ def to_contract(r: dict) -> dict:
         "seguradora": _f(r.get("seguradora"), c.get("seguradora")),
         "ramo": _f(r.get("ramo"), c.get("ramo")),
         "tipoDocumento": tipo,
+        "endossoCancelamento": bool(r.get("endosso_cancelamento")),
         "cliente": {
             "nome": _f(r.get("nome_segurado"), c.get("nome_segurado")),
             "cpfCnpj": _f(r.get("cpf_cnpj"), c.get("cpf_cnpj")),
@@ -114,8 +115,10 @@ async def parse(file: UploadFile = File(...), x_parser_token: str | None = Heade
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)
-        # use_filename=False: o nome temporário não traz pistas úteis (e não confiamos no do upload).
-        result = parse_policy_pdf(path, use_filename=False)
+        # O nome temporário não traz pistas; o nome original do upload entra só como pista de
+        # baixa confiança (nome do segurado, placa, seguradora, endosso), nunca acima do texto.
+        nome = os.path.basename((file.filename or "").replace("\\", "/"))[:200] or None
+        result = parse_policy_pdf(path, use_filename=False, filename=nome)
     finally:
         try:
             os.remove(path)

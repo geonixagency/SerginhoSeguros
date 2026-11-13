@@ -8,7 +8,10 @@
 //   caminho (ou mesmo hash no mesmo cliente), apólice por seguradora+número dentro do cliente.
 // - PDF sem arquivo disponível é pulado e contado; reimportar depois vincula os que chegaram.
 // - Parcelas vencidas entram como PAGO (carteira histórica), futuras como PENDENTE.
-// - Endosso vira Document ligado à apólice de mesmo número; carta verde, CRLV, CNH etc. só Document.
+// - Endosso vira Document ligado à apólice (número > chassi > placa); sem apólice na pasta, a apólice
+//   é criada a partir do endosso. Endosso de cancelamento marca a apólice como CANCELADA.
+// - Reimportar corrige o que já entrou: liga endossos soltos, refaz número truncado e seguradora.
+// - Carta verde, CRLV, CNH etc. só Document.
 // - Ao final recalcula ATIVO/INATIVO de todos os clientes.
 // - O relatório traz só contagens (nada de nome/CPF/telefone).
 import path from "node:path";
@@ -19,6 +22,7 @@ import { prisma } from "../../lib/prisma";
 import { dateOnly, todayIso } from "../../lib/dates";
 import { resolveInsurerSlug } from "../../connectors/catalog";
 import { recalcAllStatuses } from "../policies/rules";
+import { findPolicyForDocument, samePolicyNumber } from "../policies/match";
 
 // ------------------------------------------------------------------ formato do extrator
 const isoOrNull = z.string().nullable().optional();
@@ -90,6 +94,12 @@ export interface ImportStats {
   apolicesCriadas: number;
   apolicesDuplicadas: number;
   apolicesSemSeguradora: number;
+  /** Reimportação: apólices com número/seguradora corrigidos pela nova leitura. */
+  apolicesCorrigidas: number;
+  /** Endossos ligados a uma apólice (ou que viraram a apólice, quando ela não estava na pasta). */
+  endossosVinculados: number;
+  endossosSemApolice: number;
+  apolicesCanceladas: number;
   documentosCriados: number;
   documentosJaExistentes: number;
   arquivosForaDoStorage: number;
@@ -148,6 +158,10 @@ function emptyStats(): ImportStats {
     apolicesCriadas: 0,
     apolicesDuplicadas: 0,
     apolicesSemSeguradora: 0,
+    apolicesCorrigidas: 0,
+    endossosVinculados: 0,
+    endossosSemApolice: 0,
+    apolicesCanceladas: 0,
     documentosCriados: 0,
     documentosJaExistentes: 0,
     arquivosForaDoStorage: 0,
@@ -221,8 +235,11 @@ export async function importCarteira(
       }
     }
 
-    // Apólices mais recentes primeiro: em duplicata (mesma seguradora+número), fica a mais nova.
-    pdfs.sort((a, b) => (b.data_emissao ?? b.inicio_vigencia ?? b.fim_vigencia ?? "").localeCompare(a.data_emissao ?? a.inicio_vigencia ?? a.fim_vigencia ?? ""));
+    // Ordem importa: apólices/propostas (mais recentes primeiro: em duplicata fica a mais nova)
+    // ANTES dos endossos, senão o endosso chega antes da apólice e fica sem vínculo.
+    const rank = (p: ExtractedPolicy) => (p.tipo_documento === "apolice" || p.tipo_documento === "proposta" ? 0 : p.tipo_documento === "endosso" ? 1 : 2);
+    const quando = (p: ExtractedPolicy) => p.data_emissao ?? p.inicio_vigencia ?? p.fim_vigencia ?? "";
+    pdfs.sort((a, b) => rank(a) - rank(b) || quando(b).localeCompare(quando(a)));
     for (const p of pdfs) await importPdf(client.id, p);
   }
   opts.onProgress?.(total, total);
@@ -240,18 +257,28 @@ export async function importCarteira(
       stats.arquivosInexistentes++;
       return;
     }
-    if (await prisma.document.findFirst({ where: { caminho: file.rel }, select: { id: true } })) {
-      stats.documentosJaExistentes++;
-      return;
-    }
-    const hash = await file.hash();
-    // Mesmo arquivo já importado com outro caminho (pasta renomeada/movida): não duplica.
-    if (await prisma.document.findFirst({ where: { clientId, hash }, select: { id: true } })) {
-      stats.documentosJaExistentes++;
-      return;
-    }
     const tipoDoc = DOC_TIPO[p.tipo_documento ?? ""] ?? "OUTRO";
-    const doc = await prisma.document.create({
+    const slug = resolveInsurerSlug(p.seguradora ?? null);
+    const insurerId = slug ? insurers.get(slug) : undefined;
+
+    // PDF já importado (reimportação): não duplica o arquivo, mas corrige o que a leitura
+    // anterior errou (endosso solto, número de apólice truncado, seguradora trocada).
+    let doc = await prisma.document.findFirst({ where: { caminho: file.rel }, select: { id: true, policyId: true, clientId: true } });
+    if (!doc) {
+      const hash = await file.hash();
+      // Mesmo arquivo já importado com outro caminho (pasta renomeada/movida): não duplica.
+      doc = await prisma.document.findFirst({ where: { clientId, hash }, select: { id: true, policyId: true, clientId: true } });
+    }
+    if (doc) {
+      stats.documentosJaExistentes++;
+      if (doc.clientId !== clientId) return;
+      await prisma.document.update({ where: { id: doc.id }, data: { extraido: p as unknown as Prisma.InputJsonValue, ...(tipoDoc !== "OUTRO" ? { tipo: tipoDoc } : {}) } });
+      await reconcile(clientId, doc, p, tipoDoc, insurerId);
+      return;
+    }
+
+    const hash = await file.hash();
+    const created = await prisma.document.create({
       data: {
         clientId,
         tipo: tipoDoc,
@@ -264,36 +291,86 @@ export async function importCarteira(
       },
     });
     stats.documentosCriados++;
+    await reconcile(clientId, { id: created.id, policyId: null }, p, tipoDoc, insurerId);
+  }
 
-    const slug = resolveInsurerSlug(p.seguradora ?? null);
-    const insurerId = slug ? insurers.get(slug) : undefined;
-
-    // Endosso: anexa à apólice de mesmo número, sem criar nova apólice.
-    if (tipoDoc === "ENDOSSO") {
-      if (insurerId && p.numero_apolice) {
-        const pol = await prisma.policy.findFirst({ where: { clientId, insurerId, numero: p.numero_apolice }, select: { id: true } });
-        if (pol) await prisma.document.update({ where: { id: doc.id }, data: { policyId: pol.id } });
+  /** Liga o documento à apólice certa, criando/corrigindo a apólice quando preciso. */
+  async function reconcile(clientId: string, doc: { id: string; policyId: string | null }, p: ExtractedPolicy, tipoDoc: DocumentTipo, insurerId: string | undefined) {
+    if (tipoDoc === "ENDOSSO") return linkEndosso(clientId, doc, p, insurerId);
+    if (tipoDoc !== "APOLICE" && tipoDoc !== "PROPOSTA") return;
+    if (!insurerId) {
+      if (!doc.policyId) {
+        stats.apolicesSemSeguradora++;
+        const k = p.seguradora ?? "(vazia)";
+        naoMapeadas.set(k, (naoMapeadas.get(k) ?? 0) + 1);
       }
       return;
     }
-    if (tipoDoc !== "APOLICE" && tipoDoc !== "PROPOSTA") return;
-    if (!insurerId) {
-      stats.apolicesSemSeguradora++;
-      const k = p.seguradora ?? "(vazia)";
-      naoMapeadas.set(k, (naoMapeadas.get(k) ?? 0) + 1);
-      return;
+
+    if (doc.policyId) {
+      const atual = await prisma.policy.findUnique({ where: { id: doc.policyId }, select: { id: true, documentId: true, numero: true, insurerId: true } });
+      if (atual?.documentId === doc.id) {
+        // PDF principal da apólice: corrige número truncado ("0531") e seguradora (ex.: Porto -> Itaú).
+        const patch: Prisma.PolicyUncheckedUpdateInput = {};
+        if (p.numero_apolice && p.numero_apolice !== atual.numero && !samePolicyNumber(atual.numero, p.numero_apolice) && onlyDigits(atual.numero ?? "").length <= 4) patch.numero = p.numero_apolice;
+        if (atual.insurerId !== insurerId) patch.insurerId = insurerId;
+        if (Object.keys(patch).length) {
+          await prisma.policy.update({ where: { id: atual.id }, data: patch });
+          stats.apolicesCorrigidas++;
+        }
+        return;
+      }
+      // Estava ligado como "cópia" de outra apólice: só continua assim se for mesmo a mesma.
+      if (atual && atual.insurerId === insurerId && (!p.numero_apolice || samePolicyNumber(atual.numero, p.numero_apolice))) return;
+      await prisma.document.update({ where: { id: doc.id }, data: { policyId: null } });
     }
+
     if (p.numero_apolice) {
-      const dup = await prisma.policy.findFirst({ where: { clientId, insurerId, numero: p.numero_apolice }, select: { id: true } });
-      if (dup) {
+      const dup = await findPolicyForDocument(prisma, clientId, { insurerId, numero: p.numero_apolice });
+      if (dup?.via === "numero") {
         // Mesma apólice em outro PDF (cópia/2ª via): guarda o arquivo ligado a ela.
         await prisma.document.update({ where: { id: doc.id }, data: { policyId: dup.id } });
         stats.apolicesDuplicadas++;
         return;
       }
     }
+    await createPolicy(clientId, doc.id, p, tipoDoc, insurerId);
+  }
+
+  async function linkEndosso(clientId: string, doc: { id: string; policyId: string | null }, p: ExtractedPolicy, insurerId: string | undefined) {
+    const cancela = Boolean((p as { endosso_cancelamento?: boolean }).endosso_cancelamento);
+    let polId = doc.policyId;
+    // Só cancela com certeza do vínculo (número da apólice, ou apólice criada do próprio endosso):
+    // pela placa poderia cair na renovação da mesma seguradora.
+    let certo = Boolean(polId);
+    if (!polId) {
+      const alvo = await findPolicyForDocument(prisma, clientId, { insurerId, numero: p.numero_apolice, placa: p.placa, chassi: p.chassi });
+      if (alvo) {
+        polId = alvo.id;
+        certo = alvo.via === "numero";
+        await prisma.document.update({ where: { id: doc.id }, data: { policyId: alvo.id } });
+        stats.endossosVinculados++;
+      } else if (insurerId) {
+        // Endosso sem a apólice original na pasta: o endosso traz os dados da apólice, então
+        // ela entra na carteira a partir dele (senão o seguro some da ficha do cliente).
+        await createPolicy(clientId, doc.id, p, "ENDOSSO", insurerId);
+        stats.endossosVinculados++;
+        return;
+      } else {
+        stats.endossosSemApolice++;
+        return;
+      }
+    }
+    if (cancela && polId && certo) {
+      const r = await prisma.policy.updateMany({ where: { id: polId, status: { not: "CANCELADA" } }, data: { status: "CANCELADA" } });
+      stats.apolicesCanceladas += r.count;
+    }
+  }
+
+  async function createPolicy(clientId: string, docId: string, p: ExtractedPolicy, tipoDoc: DocumentTipo, insurerId: string) {
     const fim = isIso(p.fim_vigencia) ? p.fim_vigencia : null;
     const vencida = fim ? fim < today : Boolean(p.pasta_vencidas);
+    const cancela = tipoDoc === "ENDOSSO" && Boolean((p as { endosso_cancelamento?: boolean }).endosso_cancelamento);
     const seen = new Set<number>();
     const parcelas = (p.parcelas ?? []).filter((x) => x.parcela >= 1 && isIso(x.vencimento) && !seen.has(x.parcela) && seen.add(x.parcela));
     const temItem = Boolean(p.placa || p.chassi || p.veiculo);
@@ -310,8 +387,8 @@ export async function importCarteira(
         fimVigencia: fim ? dateOnly(fim) : null,
         premioTotal: p.premio_total ?? null,
         formaPagamento: FORMA[p.forma_pagamento ?? ""] ?? "OUTRO",
-        status: tipoDoc === "PROPOSTA" && !vencida ? "EM_EMISSAO" : vencida ? "VENCIDA" : "VIGENTE",
-        documentId: doc.id,
+        status: cancela ? "CANCELADA" : tipoDoc === "PROPOSTA" && !vencida ? "EM_EMISSAO" : vencida ? "VENCIDA" : "VIGENTE",
+        documentId: docId,
         installments: {
           create: parcelas.map((x) => ({
             numero: x.parcela,
@@ -333,9 +410,11 @@ export async function importCarteira(
           : undefined,
       },
     });
-    await prisma.document.update({ where: { id: doc.id }, data: { policyId: policy.id } });
+    await prisma.document.update({ where: { id: docId }, data: { policyId: policy.id } });
     stats.apolicesCriadas++;
+    if (cancela) stats.apolicesCanceladas++;
     stats.parcelas += parcelas.length;
     if (temItem) stats.itens++;
+    return policy;
   }
 }

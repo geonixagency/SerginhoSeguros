@@ -247,6 +247,12 @@ export interface ParsedPolicyDTO {
   paginas: number;
   /** Se já existe cliente com o CPF/CNPJ lido, o cadastro será anexado a ele. */
   clienteExistente: { id: string; nome: string } | null;
+  /** "apolice" | "endosso" | "proposta" | ... (como o leitor classificou o PDF). */
+  tipoDocumento: string | null;
+  /** Endosso de cancelamento: ao salvar, a apólice de origem passa para CANCELADA. */
+  endossoCancelamento: boolean;
+  /** Endosso de cliente existente: apólice a que ele se refere (por número, chassi ou placa). */
+  apoliceAlvo: { id: string; numero: string | null; seguradora: string; placa: string | null; status: string; via: "numero" | "chassi" | "placa" } | null;
   /** Hash SHA-256 do arquivo — se já foi importado, `documentoExistenteId` vem preenchido. */
   hash: string;
   documentoExistenteId: string | null;

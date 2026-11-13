@@ -15,6 +15,7 @@ import { documentDTO } from "../../lib/serialize";
 import { createPolicyWithChildren } from "../policies/service";
 import { refreshClientStatus } from "../policies/rules";
 import { callPdfParser } from "./pdfParser";
+import { findPolicyForDocument } from "../policies/match";
 
 const IdParams = z.object({ id: z.string().min(1) });
 
@@ -67,21 +68,56 @@ export default async function documentRoutes(app: FastifyInstance) {
     const existente = cpf ? await prisma.client.findFirst({ where: { cpfCnpj: cpf }, select: { id: true, nome: true } }) : null;
     const docExistente = await prisma.document.findFirst({ where: { hash }, select: { id: true } });
     const forma = FormaPagamentoSchema.safeParse(out.apolice.formaPagamento.valor?.toUpperCase());
+    const tipoDocumento = out.tipoDocumento ?? null;
+
+    const cliente = {
+      ...out.cliente,
+      cpfCnpj: { valor: cpf, confianca: out.cliente.cpfCnpj.confianca },
+      telefone: { valor: out.cliente.telefone.valor ? onlyDigits(out.cliente.telefone.valor) : null, confianca: out.cliente.telefone.confianca },
+    };
+    let apoliceAlvo: ParsedPolicyDTO["apoliceAlvo"] = null;
+    if (existente) {
+      // Cliente já cadastrado: o que o PDF não trouxe (endosso costuma ter só nome e CPF) vem do
+      // cadastro, com confiança cheia, em vez de aparecer vazio e "incerto" na revisão.
+      const c = await prisma.client.findUnique({ where: { id: existente.id }, select: { nome: true, nascimento: true, telefone: true, email: true, endereco: true } });
+      if (c) {
+        const end = (c.endereco ?? null) as { logradouro?: string | null; numero?: string | null; bairro?: string | null; cidade?: string | null; uf?: string | null; cep?: string | null } | null;
+        const linha = end ? [end.logradouro, end.numero, end.bairro, end.cidade, end.uf].filter(Boolean).join(", ") || null : null;
+        const fill = (f: { valor: string | null; confianca: number }, v: string | null | undefined) => (!f.valor && v ? { valor: v, confianca: 1 } : f);
+        cliente.nome = fill(cliente.nome, c.nome);
+        cliente.nascimento = fill(cliente.nascimento, c.nascimento ? c.nascimento.toISOString().slice(0, 10) : null);
+        cliente.telefone = fill(cliente.telefone, c.telefone);
+        cliente.email = fill(cliente.email, c.email);
+        cliente.endereco = fill(cliente.endereco, linha);
+        cliente.cep = fill(cliente.cep, end?.cep ?? null);
+      }
+      if (tipoDocumento === "endosso") {
+        const m = await findPolicyForDocument(prisma, existente.id, {
+          insurerId: insurer?.id,
+          numero: out.apolice.numero.valor,
+          placa: out.itens[0]?.placa,
+          chassi: out.itens[0]?.chassi,
+        });
+        if (m) {
+          const p = await prisma.policy.findUnique({ where: { id: m.id }, select: { insurer: { select: { nome: true } }, items: { select: { placa: true }, take: 1 } } });
+          apoliceAlvo = { id: m.id, numero: m.numero, seguradora: p?.insurer.nome ?? "", placa: p?.items[0]?.placa ?? null, status: m.status, via: m.via };
+        }
+      }
+    }
 
     return {
       seguradora: { valor: insurer?.nome ?? out.seguradora.valor, confianca: insurer ? out.seguradora.confianca : Math.min(out.seguradora.confianca, 0.4), insurerId: insurer?.id ?? null },
       ramo: out.ramo,
-      cliente: {
-        ...out.cliente,
-        cpfCnpj: { valor: cpf, confianca: out.cliente.cpfCnpj.confianca },
-        telefone: { valor: out.cliente.telefone.valor ? onlyDigits(out.cliente.telefone.valor) : null, confianca: out.cliente.telefone.confianca },
-      },
+      cliente,
       apolice: { ...out.apolice, formaPagamento: { valor: forma.success ? forma.data : null, confianca: out.apolice.formaPagamento.confianca } },
       itens: out.itens,
       parcelas: out.parcelas,
       avisos: out.avisos,
       paginas: out.paginas,
       clienteExistente: existente,
+      tipoDocumento,
+      endossoCancelamento: Boolean(out.endossoCancelamento),
+      apoliceAlvo,
       hash,
       documentoExistenteId: docExistente?.id ?? null,
     };
@@ -100,6 +136,10 @@ export default async function documentRoutes(app: FastifyInstance) {
     const input = parse(ClientFromPdfSchema, json);
     const insurer = await prisma.insurer.findUnique({ where: { id: input.apolice.insurerId }, select: { id: true } });
     if (!insurer) throw badRequest("Seguradora inválida");
+    const alvo = input.endossoDePolicyId
+      ? await prisma.policy.findUnique({ where: { id: input.endossoDePolicyId }, select: { id: true, clientId: true, status: true } })
+      : null;
+    if (input.endossoDePolicyId && !alvo) throw badRequest("Apólice do endosso não encontrada");
 
     // Grava o arquivo antes da transação: se a transação falhar sobra só um arquivo órfão
     // (inofensivo e deduplicado por hash), nunca um registro apontando para arquivo inexistente.
@@ -119,9 +159,16 @@ export default async function documentRoutes(app: FastifyInstance) {
           confianca: (input.confianca ?? undefined) as Prisma.InputJsonValue | undefined,
         },
       });
+      if (alvo) {
+        // Endosso de apólice já cadastrada: o PDF fica ligado a ela e nada é duplicado.
+        if (alvo.clientId !== client.id) throw badRequest("A apólice do endosso é de outro cliente");
+        await tx.document.update({ where: { id: doc.id }, data: { policyId: alvo.id } });
+        if (input.cancelarApolice && alvo.status !== "CANCELADA") await tx.policy.update({ where: { id: alvo.id }, data: { status: "CANCELADA" } });
+        return { clientId: client.id, policyId: alvo.id, documentId: doc.id, clienteCriado: client.criado };
+      }
       const policy = await createPolicyWithChildren(
         tx,
-        { ...input.apolice, clientId: client.id, documentId: doc.id },
+        { ...input.apolice, ...(input.cancelarApolice ? { status: "CANCELADA" as const } : {}), clientId: client.id, documentId: doc.id },
         input.parcelas,
         input.itens,
       );
@@ -130,7 +177,7 @@ export default async function documentRoutes(app: FastifyInstance) {
     });
 
     await refreshClientStatus(result.clientId);
-    await audit(req, "CADASTRO_POR_PDF", "Client", result.clientId, null, { policyId: result.policyId, documentId: result.documentId, clienteCriado: result.clienteCriado });
+    await audit(req, "CADASTRO_POR_PDF", "Client", result.clientId, null, { policyId: result.policyId, documentId: result.documentId, clienteCriado: result.clienteCriado, tipo: input.tipoDocumento, cancelou: Boolean(input.cancelarApolice) });
     reply.status(201);
     return result;
   });

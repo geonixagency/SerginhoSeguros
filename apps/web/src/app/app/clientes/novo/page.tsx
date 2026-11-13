@@ -33,6 +33,7 @@ import { RAMO_LABEL } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Stage = "upload" | "reading" | "review" | "saved";
+type EndossoOpts = { link: boolean; cancel: boolean };
 
 const STEPS = [
   { id: "up", label: "Recebendo o PDF", detail: "arquivo criptografado em trânsito" },
@@ -272,6 +273,8 @@ function Review({
   fileUrl,
   attach,
   setAttach,
+  endo,
+  setEndo,
   onSave,
   saving,
   onRestart,
@@ -282,6 +285,8 @@ function Review({
   fileUrl: string | null;
   attach: boolean;
   setAttach: (v: boolean) => void;
+  endo: EndossoOpts;
+  setEndo: (v: EndossoOpts) => void;
   onSave: () => void;
   saving: boolean;
   onRestart: () => void;
@@ -327,6 +332,35 @@ function Review({
           <label className="flex items-center gap-2 text-sm font-semibold">
             <Switch checked={attach} onCheckedChange={setAttach} aria-label="Anexar ao cliente existente" /> Anexar
           </label>
+        </div>
+      )}
+
+      {result.tipoDocumento === "endosso" && (
+        <div className="grid gap-3 rounded-xl border border-gold-500/30 bg-accent-soft p-4">
+          <p className="flex items-start gap-2 text-sm">
+            <FileText className="mt-0.5 size-4 shrink-0 text-accent-text" />
+            <span>
+              Este PDF é um <strong>endosso{result.endossoCancelamento ? " de cancelamento" : ""}</strong>
+              {result.apoliceAlvo && attach ? (
+                <>
+                  {" "}da apólice <strong>{result.apoliceAlvo.numero ?? "sem número"}</strong> ({result.apoliceAlvo.seguradora}
+                  {result.apoliceAlvo.placa ? ` · ${result.apoliceAlvo.placa}` : ""}) que já está na ficha. Ao salvar, ele fica anexado a essa apólice, sem criar outra.
+                </>
+              ) : (
+                <>. Não achamos na ficha a apólice a que ele se refere, então ela será cadastrada com os dados abaixo.</>
+              )}
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
+            {result.apoliceAlvo && attach && (
+              <label className="flex items-center gap-2">
+                <Switch checked={endo.link} onCheckedChange={(v) => setEndo({ ...endo, link: v })} aria-label="Anexar à apólice existente" /> Anexar à apólice existente
+              </label>
+            )}
+            <label className="flex items-center gap-2">
+              <Switch checked={endo.cancel} onCheckedChange={(v) => setEndo({ ...endo, cancel: v })} aria-label="Marcar apólice como cancelada" /> Marcar a apólice como cancelada
+            </label>
+          </div>
         </div>
       )}
 
@@ -391,7 +425,7 @@ function Review({
           <RotateCcw /> Enviar outro PDF
         </Button>
         <Button variant="gold" size="lg" onClick={onSave} loading={saving}>
-          {saving ? "Salvando…" : attach && result.clienteExistente ? "Anexar ao cliente" : "Salvar cliente e apólice"}
+          {saving ? "Salvando…" : result.tipoDocumento === "endosso" && result.apoliceAlvo && attach && endo.link ? "Anexar endosso à apólice" : attach && result.clienteExistente ? "Anexar ao cliente" : "Salvar cliente e apólice"}
         </Button>
       </div>
     </div>
@@ -411,6 +445,7 @@ export default function NewClientFromPdfPage() {
   const [result, setResult] = useState<ParseResult | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [attach, setAttach] = useState(true);
+  const [endo, setEndo] = useState<EndossoOpts>({ link: true, cancel: false });
   const [savedId, setSavedId] = useState<string | null>(null);
 
   useEffect(() => () => void (fileUrl && URL.revokeObjectURL(fileUrl)), [fileUrl]);
@@ -447,6 +482,7 @@ export default function NewClientFromPdfPage() {
         await sleep(reduce ? 0 : 450);
         setValues(Object.fromEntries(res.campos.map((c) => [c.chave, c.valor])));
         setAttach(!!res.clienteExistente);
+        setEndo({ link: true, cancel: !!res.endossoCancelamento });
         setStage("review");
       } catch (e) {
         toast.error("Não conseguimos ler este PDF", { description: e instanceof ApiError ? e.message : "Tente outro arquivo ou cadastre manualmente." });
@@ -458,7 +494,13 @@ export default function NewClientFromPdfPage() {
 
   const save = useMutation({
     mutationFn: () =>
-      api.clients.fromPdf({ documentId: result!.documentId, campos: values, anexarAoCliente: attach && result?.clienteExistente ? result.clienteExistente.id : null }),
+      api.clients.fromPdf({
+        documentId: result!.documentId,
+        campos: values,
+        anexarAoCliente: attach && result?.clienteExistente ? result.clienteExistente.id : null,
+        endossoDePolicyId: result?.tipoDocumento === "endosso" && endo.link ? (result.apoliceAlvo?.id ?? null) : null,
+        cancelarApolice: result?.tipoDocumento === "endosso" && endo.cancel,
+      }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       qc.invalidateQueries({ queryKey: ["dash"] });
@@ -503,7 +545,7 @@ export default function NewClientFromPdfPage() {
         )}
         {stage === "review" && result && (
           <motion.div key="rev" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <Review result={result} values={values} setValue={(k, v) => setValues((p) => ({ ...p, [k]: v }))} fileUrl={fileUrl} attach={attach} setAttach={setAttach} onSave={() => save.mutate()} saving={save.isPending} onRestart={restart} />
+            <Review result={result} values={values} setValue={(k, v) => setValues((p) => ({ ...p, [k]: v }))} fileUrl={fileUrl} attach={attach} setAttach={setAttach} endo={endo} setEndo={setEndo} onSave={() => save.mutate()} saving={save.isPending} onRestart={restart} />
           </motion.div>
         )}
         {stage === "saved" && (
@@ -515,7 +557,7 @@ export default function NewClientFromPdfPage() {
                   <motion.path d="M5 12.5 10 17 19 7" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.25, duration: 0.5 }} />
                 </svg>
               </motion.div>
-              <p className="relative mt-6 font-display text-4xl font-semibold">{attach && result?.clienteExistente ? "Apólice anexada!" : "Cliente cadastrado!"}</p>
+              <p className="relative mt-6 font-display text-4xl font-semibold">{result?.tipoDocumento === "endosso" && result.apoliceAlvo && attach && endo.link ? "Endosso anexado!" : attach && result?.clienteExistente ? "Apólice anexada!" : "Cliente cadastrado!"}</p>
               <p className="relative mx-auto mt-2 max-w-md text-muted">
                 {values.nome} já está na carteira, com apólice, parcelas e o PDF guardado. As réguas de cobrança passam a valer automaticamente.
               </p>

@@ -60,7 +60,7 @@ def parse_filename(fname: str) -> dict:
     out = {}
     parts = [p.strip() for p in base.split("_")]
     if parts:
-        nm = re.sub(r"(?i)^(ap[oó]lices?|endosso|proposta|renova[cç][aã]o|carta verde)\s+", "", parts[0]).strip()
+        nm = re.sub(r"(?i)^((ap[oó]lices?|endossos?|de|do|da|cancelamento|proposta|renova[cç][aã]o|carta verde|2[ªa] via)\s+)+", "", parts[0]).strip()
         out["nome"] = nm or None
     m = re.search(r"(\d{1,2})[.\-](\d{1,2})[.\-](\d{4}|\d{2})(?!\d)", base)
     if m:
@@ -138,7 +138,7 @@ def detect_ramo(text_head: str, fname: str, R: dict) -> str | None:
 
 
 # --------------------------------------------------------------------------- API pública
-def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | None = None) -> dict:
+def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | None = None, filename: str | None = None) -> dict:
     """Extrai os dados de UMA apólice em PDF.
 
     Retorna dict com os campos de FIELDS (None quando não encontrado), mais:
@@ -146,6 +146,7 @@ def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | 
       - "status_texto": "ok" | "sem_texto" | "erro"
       - "arquivo", "paginas", "seguradora_scores", "avisos"
     `use_filename=True` usa o nome do arquivo como pista/fallback (placa, data, seguradora).
+    `filename` (upload): nome original do arquivo, usado como pista mesmo com use_filename=False.
     """
     bl = blocklist if blocklist is not None else load_blocklist()
     R = Result()
@@ -153,7 +154,8 @@ def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | 
         R.setdefault(f, None)
     R["arquivo"] = path
     R["avisos"] = []
-    fn = parse_filename(path) if use_filename else {}
+    fname = filename or path
+    fn = parse_filename(fname) if (use_filename or filename) else {}
     try:
         doc = load_pdf(path)
     except Exception as e:  # PDF corrompido / protegido
@@ -165,7 +167,7 @@ def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | 
     if doc.n_chars < MIN_CHARS or _garbage(doc.text):
         R["status_texto"] = "sem_texto"
         _apply_filename_fallbacks(R, fn)
-        R["tipo_documento"] = detect_doc_type(path, "")
+        R["tipo_documento"] = detect_doc_type(fname, "")
         return _finish(R)
     R["status_texto"] = "ok"
 
@@ -174,7 +176,7 @@ def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | 
     fins = fn.get("seguradora")
     # nome do arquivo vence quando a seguradora dele também é citada no texto (ex.: Itaú Auto é
     # operado pela Porto e os PDFs citam as duas); sem nome de arquivo, regra de grupo:
-    if ins == "Porto Seguro" and re.search(r"itau seguros|itau auto", doc.norm):
+    if ins in ("Porto Seguro", "Itaú") and re.search(r"itau seguros?|itau auto|marca licenciada.{0,40}porto", doc.norm):
         ins = "Itaú"
     if fins and scores.get(fins, 0) > 0:
         ins = fins
@@ -198,7 +200,11 @@ def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | 
             R["avisos"].append(f"refine_erro: {type(e).__name__}: {e}"[:200])
 
     head = "\n".join(l.text for l in doc.lines[:60])
-    R.put("tipo_documento", detect_doc_type(path, head), 0.8)
+    R.put("tipo_documento", detect_doc_type(fname, head), 0.8)
+    # Endosso de cancelamento: a apólice original deixa de valer na data do endosso.
+    R["endosso_cancelamento"] = R.get("tipo_documento") == "endosso" and bool(
+        re.search(r"endosso de cancelamento|\d{4} - cancelamento de cobertura|cancelamento total da apolice|tipo de endosso:? ?cancelamento", N.norm_key(head + " " + doc.text[:6000]))
+        or re.search(r"cancelamento", N.norm_key(os.path.basename(fname))))
     R.put("ramo", detect_ramo("\n".join(l.text for l in doc.lines[:250]), path, R), 0.7)
     _apply_filename_fallbacks(R, fn)
     _sanity(R)
@@ -224,7 +230,7 @@ def _apply_filename_fallbacks(R: Result, fn: dict):
     if fn.get("data") and not R.get("fim_vigencia"):
         R.put("fim_vigencia", fn["data"], 0.4)
         R["confianca"]["fim_vigencia_fonte"] = "nome_arquivo"
-    if fn.get("nome") and not R.get("nome_segurado") and R.get("status_texto") != "ok":
+    if fn.get("nome") and not R.get("nome_segurado"):
         R.put("nome_segurado", fn["nome"].upper(), 0.3)
 
 

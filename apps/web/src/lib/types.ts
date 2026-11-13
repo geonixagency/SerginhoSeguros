@@ -80,6 +80,10 @@ export interface ImportStats {
   apolicesCriadas: number;
   apolicesDuplicadas: number;
   apolicesSemSeguradora: number;
+  apolicesCorrigidas?: number;
+  endossosVinculados?: number;
+  endossosSemApolice?: number;
+  apolicesCanceladas?: number;
   documentosCriados: number;
   documentosJaExistentes: number;
   arquivosForaDoStorage: number;
@@ -454,11 +458,20 @@ export interface ParseResult {
   campos: ParsedField[];
   clienteExistente: { id: string; nome: string } | null;
   duracaoMs: number;
+  /** "apolice" | "endosso" | "proposta" | ... */
+  tipoDocumento?: string | null;
+  endossoCancelamento?: boolean;
+  /** Endosso de cliente existente: a apólice a que ele se refere. */
+  apoliceAlvo?: { id: string; numero: string | null; seguradora: string; placa: string | null; status: string; via: "numero" | "chassi" | "placa" } | null;
 }
 export interface CreateFromPdfInput {
   documentId: string;
   campos: Record<string, string>;
   anexarAoCliente?: string | null;
+  /** Endosso: liga o PDF a esta apólice em vez de criar outra. */
+  endossoDePolicyId?: string | null;
+  /** Endosso de cancelamento: a apólice passa para Cancelada. */
+  cancelarApolice?: boolean;
 }
 
 export type ActionId = "BOLETO_2VIA" | "STATUS_APOLICE" | "STATUS_PARCELAS" | "SINISTROS";

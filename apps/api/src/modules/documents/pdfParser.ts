@@ -26,6 +26,8 @@ export interface ParserOutput {
   parcelas: Array<{ numero: number; valor: number | null; vencimento: string | null; confianca: number }>;
   avisos: string[];
   paginas: number;
+  tipoDocumento?: string | null;
+  endossoCancelamento?: boolean;
 }
 
 export async function callPdfParser(pdf: Buffer, filename: string): Promise<ParserOutput> {

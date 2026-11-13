@@ -60,6 +60,11 @@ def cut_labels(s: str) -> str:
 
 def _v_policy(s: str):
     s = s.strip()
+    # Porto/Itaú/Azul: "0531 65 12345678" ou "65 25 0531 12345678" (sucursal, ramo, número).
+    # Sem isto o número virava só "0531" e apólices diferentes do mesmo cliente se fundiam.
+    g = re.match(r"(\d{2,4}(?: \d{2,4}){1,3} \d{6,10})(?![\d.,/])", s)
+    if g:
+        return g.group(1)
     m = re.search(r"(?<![\w])([A-Z]{0,3}[\d][\dA-Z./\-]{2,32}[\dA-Z]|\d{4,})(?![\w])", s.upper())
     if not m:
         return None
@@ -67,7 +72,7 @@ def _v_policy(s: str):
     digits = re.sub(r"\D", "", v)
     if len(digits) < 4 or "," in v:
         return None
-    if N.DATE_RE.fullmatch(v) or re.fullmatch(r"\d{1,2}/\d{4}", v):
+    if N.DATE_RE.fullmatch(v) or re.fullmatch(r"\d{1,2}/\d{4}", v) or re.fullmatch(r"(19|20)\d{2}", v):  # ano solto não é apólice
         return None
     if v.startswith("15414") or v.startswith("10.") and len(digits) == 11:  # processo SUSEP
         return None

@@ -490,6 +490,9 @@ function parseResult(dto: ParsedPolicyDTO, file: File, ms: number): ParseResult 
     campos,
     clienteExistente: dto.clienteExistente,
     duracaoMs: ms,
+    tipoDocumento: dto.tipoDocumento ?? null,
+    endossoCancelamento: dto.endossoCancelamento ?? false,
+    apoliceAlvo: dto.apoliceAlvo ?? null,
   };
 }
 
@@ -538,7 +541,9 @@ async function fromPdf(input: CreateFromPdfInput): Promise<{ clientId: string; c
     itens: dto.itens.length
       ? [{ tipo: "VEICULO", placa: s("placa"), modelo: s("modelo"), ano: s("ano"), chassi: s("chassi") }]
       : [],
-    tipoDocumento: "APOLICE",
+    tipoDocumento: dto.tipoDocumento === "endosso" ? "ENDOSSO" : dto.tipoDocumento === "proposta" ? "PROPOSTA" : "APOLICE",
+    endossoDePolicyId: input.anexarAoCliente && input.endossoDePolicyId ? input.endossoDePolicyId : null,
+    cancelarApolice: Boolean(input.cancelarApolice),
     confianca: Object.fromEntries(Object.entries(dto.cliente).map(([k, f]) => [k, f.confianca])),
   };
   if (!data.apolice.insurerId) throw new Error("Seguradora não encontrada. Digite o nome como aparece em Seguradoras (ex.: Porto, Allianz).");

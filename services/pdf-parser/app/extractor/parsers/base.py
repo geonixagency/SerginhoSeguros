@@ -197,6 +197,11 @@ def run_generic(doc: Doc, profile: dict, R: Result, blocklist: dict):
     h = E.find(doc, lab("apolice"), "policy", exclude=exc("apolice"))
     if h:
         R.put("numero_apolice", h.value, h.conf)
+    # Yelum/Liberty: "Apólice 31.12.2024.0123456" (ramo.sucursal.ano.sequência). O formato parece
+    # data, então a busca genérica pulava e pegava o "2024" de um "dezembro de 2024" qualquer.
+    m = re.search(r"ap[oó]lice[^\n]{0,80}\n?\s*(?<![\d.])(\d{2}\.\d{2}\.\d{4}\.\d{5,10})(?!\d)", doc.text, re.I)
+    if m:
+        R.put("numero_apolice", m.group(1), 0.95, overwrite=True)
     h = E.find(doc, lab("proposta"), "policy", exclude=exc("proposta"), exclude_scope="seg")
     if h:
         R.put("proposta", h.value, h.conf)

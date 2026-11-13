@@ -127,6 +127,21 @@ describe.skipIf(!enabled)("importação da carteira (integração)", async () =>
     expect(r2.stats).toMatchObject({ clientesCriados: 0, apolicesCriadas: 0, documentosCriados: 0, documentosJaExistentes: 2 });
   });
 
+  it("endosso mais novo que a apólice fica ligado a ela; reimportar corrige número truncado e cancela", async () => {
+    const pol = await prisma.policy.findFirstOrThrow({ where: { client: { cpfCnpj: CPF } }, select: { id: true } });
+    // Simula a leitura antiga: número truncado e endosso solto.
+    await prisma.policy.update({ where: { id: pol.id }, data: { numero: "0531" } });
+    await prisma.document.updateMany({ where: { tipo: "ENDOSSO", client: { cpfCnpj: CPF } }, data: { policyId: null } });
+    const d = dados();
+    d.policies[1] = { ...d.policies[1]!, data_emissao: futuro, endosso_cancelamento: true } as unknown as (typeof d.policies)[number];
+    const r = await importCarteira(d, { resolveFile: await storageResolver() });
+    expect(r.stats).toMatchObject({ apolicesCriadas: 0, apolicesCorrigidas: 1, endossosVinculados: 1, apolicesCanceladas: 1 });
+    const p = await prisma.policy.findUniqueOrThrow({ where: { id: pol.id }, include: { documents: true } });
+    expect(p.numero).toBe("TESTE-IMP-1");
+    expect(p.status).toBe("CANCELADA");
+    expect(p.documents).toHaveLength(2);
+  });
+
   it("POST /import/carteira roda em segundo plano e reporta progresso", async () => {
     const boundary = "----teste2";
     const d = dados();

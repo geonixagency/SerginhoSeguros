@@ -196,6 +196,10 @@ export const ClientFromPdfSchema = z.object({
   parcelas: z.array(InstallmentInputSchema).max(120).default([]),
   itens: z.array(InsuredItemInputSchema).max(50).default([]),
   tipoDocumento: DocumentTipoSchema.default("APOLICE"),
+  /** Endosso: apólice existente do cliente a que o PDF se refere. Com ele, nenhuma apólice nova é criada. */
+  endossoDePolicyId: z.string().min(1).max(64).optional().nullable(),
+  /** Endosso de cancelamento: marca a apólice de origem como CANCELADA. */
+  cancelarApolice: z.boolean().optional(),
   /** Saída original do parser, guardada para auditoria/treino. */
   extraido: z.record(z.string(), z.unknown()).optional(),
   confianca: z.record(z.string(), z.number().min(0).max(1)).optional(),
