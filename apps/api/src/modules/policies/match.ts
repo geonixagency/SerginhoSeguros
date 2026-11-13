@@ -40,16 +40,20 @@ export async function findPolicyForDocument(db: Db, clientId: string, hint: Poli
   const pick = (via: MatchedPolicy["via"], p: (typeof pols)[number] | undefined): MatchedPolicy | null =>
     p ? { id: p.id, numero: p.numero, status: p.status, insurerId: p.insurerId, fimVigencia: p.fimVigencia, via } : null;
 
+  const ch = (hint.chassi ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const pl = plate(hint.placa);
+  const sameItem = (p: (typeof pols)[number]) =>
+    p.items.some((i) => (ch.length >= 8 && (i.chassi ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === ch) || (pl.length === 7 && plate(i.placa) === pl));
   if (hint.numero) {
-    const hit = pols.find((p) => samePolicyNumber(p.numero, hint.numero));
+    const hits = pols.filter((p) => samePolicyNumber(p.numero, hint.numero));
+    // Frota: o mesmo número vale para vários veículos; fica com o do mesmo chassi/placa.
+    const hit = hits.find(sameItem) ?? hits[0];
     if (hit) return pick("numero", hit);
   }
-  const ch = (hint.chassi ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (ch.length >= 8) {
     const hit = pols.find((p) => p.items.some((i) => (i.chassi ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === ch));
     if (hit) return pick("chassi", hit);
   }
-  const pl = plate(hint.placa);
   if (pl.length === 7) {
     // Mesma placa: a apólice mais recente da mesma seguradora (lista já vem da vigência mais nova).
     const hit = pols.find((p) => p.items.some((i) => plate(i.placa) === pl));

@@ -225,6 +225,22 @@ export default async function documentRoutes(app: FastifyInstance) {
     return reply.status(201).send(docs.map(documentDTO));
   });
 
+  /** Move o documento para outra apólice do mesmo cliente (ou o solta, com policyId null). */
+  app.patch("/documents/:id", async (req) => {
+    const { id } = parse(IdParams, req.params);
+    const input = parse(z.object({ policyId: z.string().min(1).max(64).nullable() }), req.body);
+    const doc = await prisma.document.findUnique({ where: { id }, select: { id: true, clientId: true, policyId: true } });
+    if (!doc) throw notFound("Documento");
+    if (input.policyId) {
+      if (!doc.clientId) throw badRequest("Documento sem cliente");
+      const pol = await prisma.policy.findFirst({ where: { id: input.policyId, clientId: doc.clientId }, select: { id: true } });
+      if (!pol) throw badRequest("Apólice não pertence a este cliente");
+    }
+    const updated = await prisma.document.update({ where: { id }, data: { policyId: input.policyId } });
+    await audit(req, "MOVER_DOCUMENTO", "Document", id, { policyId: doc.policyId }, { policyId: input.policyId });
+    return documentDTO(updated);
+  });
+
   // Stream autenticado do PDF. Todo download fica na auditoria (LGPD).
   app.get("/documents/:id/file", async (req, reply) => {
     const { id } = parse(IdParams, req.params);
