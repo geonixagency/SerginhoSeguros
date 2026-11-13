@@ -199,9 +199,18 @@ def run_generic(doc: Doc, profile: dict, R: Result, blocklist: dict):
         R.put("numero_apolice", h.value, h.conf)
     # Yelum/Liberty: "Apólice 31.12.2024.0123456" (ramo.sucursal.ano.sequência). O formato parece
     # data, então a busca genérica pulava e pegava o "2024" de um "dezembro de 2024" qualquer.
-    m = re.search(r"ap[oó]lice[^\n]{0,80}\n?\s*(?<![\d.])(\d{2}\.\d{2}\.\d{4}\.\d{5,10})(?!\d)", doc.text, re.I)
+    m = re.search(r"ap[oó]lice[\s\S]{0,150}?(?<![\d.])(\d{2}\.\d{2}\.20\d{2}\.\d{5,10})(?!\d)", doc.text, re.I)
     if m:
         R.put("numero_apolice", m.group(1), 0.95, overwrite=True)
+    # Ainda curto ("0531" = só a sucursal, "1.212" = pedaço de outro campo): procura o número
+    # completo perto de um rótulo de apólice (Porto/Itaú "Apólice Endossada: 0531 65 12345678",
+    # "Apólice atual: ...", Tokio "Apólice: 12345678"), ou a linha solta no formato Porto.
+    if len(re.sub(r"\D", "", R.get("numero_apolice") or "")) <= 4:
+        m = (re.search(r"ap[oó]lice(?! anterior)[^\n:]{0,25}:?\s*(\d{4} \d{2} \d{7,8})(?!\d)", doc.text, re.I)
+             or re.search(r"(?m)^\s*(\d{4} \d{2} \d{7,8})\s*$", doc.text)
+             or re.search(r"ap[oó]lice:\s*(\d{7,12})(?![\d./-])", doc.text, re.I))
+        if m:
+            R.put("numero_apolice", m.group(1), 0.85, overwrite=True)
     h = E.find(doc, lab("proposta"), "policy", exclude=exc("proposta"), exclude_scope="seg")
     if h:
         R.put("proposta", h.value, h.conf)

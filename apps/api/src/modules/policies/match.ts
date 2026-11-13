@@ -17,6 +17,8 @@ export function samePolicyNumber(a: string | null | undefined, b: string | null 
   if (x.length < 4 || y.length < 4) return false;
   if (x === y) return true;
   const [short, long] = x.length < y.length ? [x, y] : [y, x];
+  // Azul: "65.24.0531.015051.000" (o final é o nº do endosso) = "65.24.0531.015051".
+  if (short.length >= 10 && long.length - short.length <= 3 && long.startsWith(short)) return true;
   return short.length >= 6 && long.endsWith(short);
 }
 

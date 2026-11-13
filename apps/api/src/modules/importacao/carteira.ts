@@ -360,6 +360,18 @@ export async function importCarteira(
         stats.endossosSemApolice++;
         return;
       }
+    } else {
+      // Apólice criada a partir deste endosso numa leitura antiga: corrige número truncado e seguradora.
+      const atual = await prisma.policy.findUnique({ where: { id: polId }, select: { id: true, documentId: true, numero: true, insurerId: true } });
+      if (atual?.documentId === doc.id) {
+        const patch: Prisma.PolicyUncheckedUpdateInput = {};
+        if (p.numero_apolice && !samePolicyNumber(atual.numero, p.numero_apolice) && onlyDigits(atual.numero ?? "").length <= 4) patch.numero = p.numero_apolice;
+        if (insurerId && atual.insurerId !== insurerId) patch.insurerId = insurerId;
+        if (Object.keys(patch).length) {
+          await prisma.policy.update({ where: { id: atual.id }, data: patch });
+          stats.apolicesCorrigidas++;
+        }
+      }
     }
     if (cancela && polId && certo) {
       const r = await prisma.policy.updateMany({ where: { id: polId, status: { not: "CANCELADA" } }, data: { status: "CANCELADA" } });

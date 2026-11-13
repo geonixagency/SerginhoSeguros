@@ -559,7 +559,9 @@ export default function NewClientFromPdfPage() {
               </motion.div>
               <p className="relative mt-6 font-display text-4xl font-semibold">{result?.tipoDocumento === "endosso" && result.apoliceAlvo && attach && endo.link ? "Endosso anexado!" : attach && result?.clienteExistente ? "Apólice anexada!" : "Cliente cadastrado!"}</p>
               <p className="relative mx-auto mt-2 max-w-md text-muted">
-                {values.nome} já está na carteira, com apólice, parcelas e o PDF guardado. As réguas de cobrança passam a valer automaticamente.
+                {result?.tipoDocumento === "endosso" && result.apoliceAlvo && attach && endo.link
+                  ? `O endosso foi guardado na apólice ${result.apoliceAlvo.numero ?? ""} de ${values.nome}${endo.cancel ? ", que agora aparece como cancelada" : ""}.`
+                  : `${values.nome} já está na carteira, com apólice, parcelas e o PDF guardado. As réguas de cobrança passam a valer automaticamente.`}
               </p>
               <div className="relative mt-8 flex flex-wrap justify-center gap-2">
                 <Button variant="outline" onClick={restart}>

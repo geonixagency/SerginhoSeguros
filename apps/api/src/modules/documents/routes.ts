@@ -84,7 +84,8 @@ export default async function documentRoutes(app: FastifyInstance) {
         const end = (c.endereco ?? null) as { logradouro?: string | null; numero?: string | null; bairro?: string | null; cidade?: string | null; uf?: string | null; cep?: string | null } | null;
         const linha = end ? [end.logradouro, end.numero, end.bairro, end.cidade, end.uf].filter(Boolean).join(", ") || null : null;
         const fill = (f: { valor: string | null; confianca: number }, v: string | null | undefined) => (!f.valor && v ? { valor: v, confianca: 1 } : f);
-        cliente.nome = fill(cliente.nome, c.nome);
+        // Nome lido com pouca certeza (ex.: só do nome do arquivo) perde para o do cadastro.
+        cliente.nome = cliente.nome.confianca < 0.6 && c.nome ? { valor: c.nome, confianca: 1 } : fill(cliente.nome, c.nome);
         cliente.nascimento = fill(cliente.nascimento, c.nascimento ? c.nascimento.toISOString().slice(0, 10) : null);
         cliente.telefone = fill(cliente.telefone, c.telefone);
         cliente.email = fill(cliente.email, c.email);
