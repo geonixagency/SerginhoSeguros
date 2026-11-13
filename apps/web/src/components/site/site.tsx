@@ -98,7 +98,7 @@ const PRODUCTS: { ramo: Ramo; icon: typeof Car; title: string; text: string; poi
     icon: PiggyBank,
     title: "Consórcio",
     text: "Planeje a compra do carro ou do imóvel sem juros, com parcelas que cabem no mês.",
-    points: ["Imóveis e veículos", "Sem juros, sem entrada"],
+    points: ["Imóveis e veículos", "Sem juros, com parcelas planejadas"],
     span: "lg:col-span-4",
   },
 ];
