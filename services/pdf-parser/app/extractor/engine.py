@@ -72,7 +72,7 @@ def _v_policy(s: str):
     digits = re.sub(r"\D", "", v)
     if len(digits) < 4 or "," in v:
         return None
-    if N.DATE_RE.fullmatch(v) or re.fullmatch(r"\d{1,2}/\d{4}", v) or re.fullmatch(r"(19|20)\d{2}|0800", v):  # ano solto não é apólice
+    if N.DATE_RE.fullmatch(v) or re.fullmatch(r"\d{1,2}/\d{4}", v) or re.fullmatch(r"(19|20)\d{2}|0800|\d{2}\.?\d{3}\.?\d{3}/\d{4}-?\d{2}", v):  # ano solto, 0800 e CNPJ não são apólice
         return None
     if v.startswith("15414") or v.startswith("10.") and len(digits) == 11:  # processo SUSEP
         return None
