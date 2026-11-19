@@ -34,6 +34,8 @@ export function formatDateTime(iso: string | Date | null | undefined) {
   return d.toLocaleString("pt-BR", { timeZone: TZ, dateStyle: "short", timeStyle: "short" });
 }
 export function formatDayMonth(iso: string) {
+  // Data pura (aaaa-mm-dd): meio-dia evita cair no dia anterior em UTC-3.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) iso = `${iso}T12:00:00-03:00`;
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "short" }).replace(".", "");
 }
 export function formatRelative(iso: string) {

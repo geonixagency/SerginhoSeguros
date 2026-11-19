@@ -398,7 +398,7 @@ export const ExpiringQuerySchema = z
   .refine((v) => !v.de === !v.ate, "Informe as duas datas do período")
   .refine((v) => !v.de || !v.ate || v.de <= v.ate, "A data inicial deve ser antes da final");
 export const InstallmentsDueQuerySchema = z.object({ range: z.enum(["today", "week"]).default("today") });
-export const BirthdaysQuerySchema = z.object({ scope: z.enum(["today", "month"]).default("today") });
+export const BirthdaysQuerySchema = z.object({ scope: z.enum(["today", "week", "month"]).default("today") });
 
 // ---------------------------------------------------------------- envio avulso / site
 /** POST /messaging/send — mensagem avulsa para um cliente (respeita opt-out, janela e fila). */

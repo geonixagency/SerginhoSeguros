@@ -744,17 +744,26 @@ export const realApi = {
       };
     },
     birthdays: async (): Promise<Birthday[]> => {
-      const r = await http.get<{ data: BirthdayDTO[] }>("/dashboard/birthdays?scope=month");
+      // "week" já vem filtrado (hoje + 7 dias, inclusive na virada do mês); API antiga só tem "month".
+      const r = await http
+        .get<{ data: BirthdayDTO[] }>("/dashboard/birthdays?scope=week")
+        .catch(() => http.get<{ data: BirthdayDTO[] }>("/dashboard/birthdays?scope=month"));
       const t = today();
-      const [y] = t.split("-");
+      const y = Number(t.slice(0, 4));
       const limit = new Date(`${t}T12:00:00`);
       limit.setDate(limit.getDate() + 7);
-      const lim = limit.toISOString().slice(0, 10);
+      const lim = `${limit.getFullYear()}-${String(limit.getMonth() + 1).padStart(2, "0")}-${String(limit.getDate()).padStart(2, "0")}`;
       return r.data
-        .map((b) => ({ b, data: `${y}-${b.nascimento.slice(5, 10)}` }))
+        .map((b) => {
+          const md = b.nascimento.slice(5, 10);
+          // Aniversário que já passou neste ano cai no ano que vem (dezembro -> janeiro).
+          const data = `${y}-${md}` < t ? `${y + 1}-${md}` : `${y}-${md}`;
+          return { b, data };
+        })
         .filter(({ b, data }) => data >= t && data <= lim && !b.optOut)
-        .sort((a, b) => a.data.localeCompare(b.data))
-        .map(({ b, data }) => ({ clientId: b.id, nome: b.nome, telefone: b.telefone ?? "", data, idade: b.idade, hoje: data === t, mensagemEnviada: false }));
+        .sort((a, b) => a.data.localeCompare(b.data) || a.b.nome.localeCompare(b.b.nome))
+        // Idade que a pessoa completa no aniversário mostrado.
+        .map(({ b, data }) => ({ clientId: b.id, nome: b.nome, telefone: b.telefone ?? "", data, idade: Number(data.slice(0, 4)) - Number(b.nascimento.slice(0, 4)), hoje: data === t, mensagemEnviada: false }));
     },
   },
   clients: {

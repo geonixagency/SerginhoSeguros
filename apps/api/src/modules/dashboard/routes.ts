@@ -173,8 +173,15 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     const { scope } = parse(BirthdaysQuerySchema, req.query);
     const today = todayIso();
     const [y, m, d] = today.split("-").map(Number) as [number, number, number];
+    // "week": hoje + 7 dias, atravessando a virada de mês/ano (dia/mês comparados como "MM-DD").
+    const semana = Array.from({ length: 8 }, (_, i) => addDays(today, i).slice(5));
     const rows =
-      scope === "today"
+      scope === "week"
+        ? await prisma.$queryRaw<Array<{ id: string; nome: string; nascimento: Date; telefone: string | null; status: "ATIVO" | "INATIVO"; opt_out: boolean }>>`
+            SELECT id, nome, nascimento, telefone, status, opt_out FROM clients
+            WHERE nascimento IS NOT NULL AND to_char(nascimento, 'MM-DD') = ANY(${semana})
+            ORDER BY nome`
+        : scope === "today"
         ? await prisma.$queryRaw<Array<{ id: string; nome: string; nascimento: Date; telefone: string | null; status: "ATIVO" | "INATIVO"; opt_out: boolean }>>`
             SELECT id, nome, nascimento, telefone, status, opt_out FROM clients
             WHERE nascimento IS NOT NULL AND EXTRACT(MONTH FROM nascimento) = ${m} AND EXTRACT(DAY FROM nascimento) = ${d}

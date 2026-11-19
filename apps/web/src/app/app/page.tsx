@@ -391,7 +391,7 @@ function Birthdays() {
           <li key={b.clientId} className={cn("flex items-center gap-3 rounded-xl px-2.5 py-2", b.hoje && "bg-accent-soft")}>
             <div className={cn("grid w-12 shrink-0 place-items-center rounded-lg py-1 text-center", b.hoje ? "bg-gold-gradient text-ink-950" : "bg-sunken")}>
               <span className="text-[10px] font-bold uppercase">{b.hoje ? "Hoje" : formatDayMonth(b.data).split(" ")[1]}</span>
-              <span className="font-display text-lg font-bold leading-none">{new Date(b.data).getDate()}</span>
+              <span className="font-display text-lg font-bold leading-none">{Number(b.data.slice(8, 10))}</span>
             </div>
             <div className="min-w-0 flex-1">
               <Link href={`/app/clientes/${b.clientId}`} className="block truncate text-sm font-semibold hover:text-accent-text">
