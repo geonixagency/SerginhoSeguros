@@ -71,6 +71,12 @@ def to_contract(r: dict) -> dict:
         "ramo": _f(r.get("ramo"), c.get("ramo")),
         "tipoDocumento": tipo,
         "endossoCancelamento": bool(r.get("endosso_cancelamento")),
+        # Endosso: número, motivos, condutor, valor cobrado/devolvido e o endereço em partes
+        # (a API compara com o cadastro e propõe só o que mudou).
+        "endosso": {
+            **r["endosso"],
+            "endereco": {k: r.get(k) for k in ("endereco", "bairro", "cidade", "uf", "cep")},
+        } if r.get("endosso") else None,
         "cliente": {
             "nome": _f(r.get("nome_segurado"), c.get("nome_segurado")),
             "cpfCnpj": _f(r.get("cpf_cnpj"), c.get("cpf_cnpj")),

@@ -25,6 +25,7 @@ from . import normalize as N
 from .parsers import get_parser
 from .parsers.base import Result, run_generic
 from .pdftext import load_pdf
+from .endorsement import endorsement_details
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Lista de contatos/documentos da corretora e seguradoras (não são do cliente). Gerada a
@@ -208,6 +209,11 @@ def parse_policy_pdf(path: str, *, use_filename: bool = True, blocklist: dict | 
     R.put("ramo", detect_ramo("\n".join(l.text for l in doc.lines[:250]), path, R), 0.7)
     _apply_filename_fallbacks(R, fn)
     _sanity(R)
+    if R.get("tipo_documento") == "endosso":
+        try:
+            R["endosso"] = endorsement_details(doc, R)
+        except Exception as e:  # leitura do endosso é extra: nunca derruba a leitura principal
+            R["avisos"].append(f"endosso_erro: {type(e).__name__}: {e}"[:200])
     return _finish(R)
 
 

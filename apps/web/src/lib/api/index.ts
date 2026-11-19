@@ -1,5 +1,6 @@
 import { http, qs, fetchFileUrl, IS_DEMO } from "./client";
 import { realApi } from "./real";
+import { endorsementsApi } from "./endorsements";
 import type {
   PortalAccess,
   PatchCredentialInput,
@@ -148,6 +149,7 @@ const demoApi = {
       return http.post<DocumentFile[]>(`/clients/${clientId}/documents`, fd);
     },
   },
+  endorsements: endorsementsApi,
   policies: {
     list: (clientId?: string) => http.get<Policy[]>(`/policies${qs({ clientId })}`),
     create: (data: PolicyInput) => http.post<Policy>("/policies", data),

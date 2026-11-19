@@ -29,6 +29,7 @@ import {
   Zap,
   AlertTriangle,
   CircleDollarSign,
+  FileSignature,
 } from "lucide-react";
 import { InstallmentStatusBadge, MessageStatusBadge, PolicyStatusBadge, RamoTag } from "@/components/app/bits";
 import { PdfViewer } from "@/components/app/pdf-viewer";
@@ -38,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, Badge, Card, EmptyState, ErrorState, Skeleton } from "@/components/ui/primitives";
 import { Dialog, DialogContent, Tabs, TabsContent } from "@/components/ui/overlays";
 import { ClientClaimsCard } from "@/components/app/claims";
+import { EndorsementDialog } from "@/components/app/endorsement-dialog";
 import { WhatsAppIcon } from "@/components/site/whatsapp-icon";
 import { api } from "@/lib/api";
 import type { ClientDetail, DocumentFile, Policy, TimelineType } from "@/lib/types";
@@ -168,6 +170,11 @@ function ApolicesTab({ c, onNew, onEdit, onDelete }: { c: ClientDetail; onNew: (
                   {p.item.placa && <span className="ml-auto rounded bg-ink-900 px-2 py-0.5 font-mono text-xs font-bold tracking-wider text-gold-300">{p.item.placa}</span>}
                 </div>
               )}
+              {p.condutor && (
+                <p className="mt-2 text-xs text-muted">
+                  Principal condutor: <span className="font-semibold text-foreground">{p.condutor}</span>
+                </p>
+              )}
               <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
                 <div>
                   <dt className="text-xs text-muted">Prêmio</dt>
@@ -296,6 +303,99 @@ function DocumentosTab({ c, onAttach }: { c: ClientDetail; onAttach: () => void 
   );
 }
 
+function EndossosTab({ c, onUpload }: { c: ClientDetail; onUpload: () => void }) {
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ["client-endorsements", c.id], queryFn: () => api.endorsements.list(c.id) });
+  const [abrir, setAbrir] = useState<{ id: string; nome: string } | null>(null);
+  const load = useCallback(() => api.documents.fileUrl(abrir?.id ?? ""), [abrir?.id]);
+  if (isLoading) return <Skeleton className="h-64" />;
+  if (isError) return <Card><ErrorState message={(error as Error).message} onRetry={() => refetch()} /></Card>;
+  const regs = data?.registros ?? [];
+  const antigos = data?.documentosAntigos ?? [];
+  const botao = (
+    <Button variant="gold" onClick={onUpload}>
+      <FileSignature /> Subir endosso
+    </Button>
+  );
+  const money = (campo: string, v: string | null) => (v == null ? "vazio" : campo === "policy.premioTotal" ? formatBRL(Number(v)) : v);
+  if (!regs.length && !antigos.length)
+    return <EmptyState icon={<FileSignature />} title="Nenhum endosso" description="Suba o PDF do endosso: eu acho a apólice, mostro o que mudou e guardo o documento aqui." action={botao} />;
+  return (
+    <div className="grid gap-4">
+      <div className="flex justify-end">{botao}</div>
+      {regs.map((r) => (
+        <Card key={r.id} className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">
+                Endosso{r.numero ? ` nº ${r.numero}` : ""} · {r.seguradora} · apólice <span className="font-mono">{r.apoliceNumero ?? "—"}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                {r.emissao ? `Emitido em ${formatDate(r.emissao)} · ` : ""}registrado em {formatDateTime(r.criadoEm)}
+                {r.autor ? ` por ${r.autor}` : ""}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {r.motivos.map((m) => (
+                <Badge key={m} tone={m === "Cancelamento" ? "danger" : "gold"}>
+                  {m}
+                </Badge>
+              ))}
+              {r.cancelou && !r.motivos.includes("Cancelamento") && <Badge tone="danger">Apólice cancelada</Badge>}
+            </div>
+          </div>
+          {r.alteracoes.length > 0 ? (
+            <ul className="mt-3 grid gap-1.5 text-sm">
+              {r.alteracoes.map((a) => (
+                <li key={a.campo} className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="w-36 shrink-0 text-xs font-semibold text-muted">{a.label}</span>
+                  <span className="text-muted line-through">{money(a.campo, a.antes)}</span>
+                  <span className="text-muted">→</span>
+                  <span className="font-semibold">{money(a.campo, a.depois)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-muted">Sem mudança nos dados da apólice.</p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-muted">{r.premio != null ? `Valor do endosso: ${formatBRL(r.premio)}${r.restituicao ? " (devolvido)" : ""}` : ""}</span>
+            {r.documentId && (
+              <Button variant="outline" size="sm" onClick={() => setAbrir({ id: r.documentId!, nome: r.documentoNome ?? "endosso.pdf" })}>
+                <FileText /> Ver PDF
+              </Button>
+            )}
+          </div>
+          {r.observacao && <p className="mt-2 text-sm text-muted">{r.observacao}</p>}
+        </Card>
+      ))}
+      {antigos.length > 0 && (
+        <Card className="p-5">
+          <p className="text-sm font-bold">PDFs de endosso já guardados</p>
+          <p className="mb-3 text-xs text-muted">Vieram antes do registro de endossos (importação da carteira). Estão ligados às apólices, sem o detalhe do que mudou.</p>
+          <ul className="grid gap-2">
+            {antigos.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0">
+                  <span className="block truncate">{d.nome}</span>
+                  <span className="block text-xs text-muted">{d.seguradora ? `${d.seguradora} · apólice ${d.apoliceNumero ?? "—"}` : "sem apólice ligada"}</span>
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setAbrir({ id: d.id, nome: d.nome })}>
+                  <FileText /> Ver
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      <Dialog open={!!abrir} onOpenChange={(o) => !o && setAbrir(null)}>
+        <DialogContent className="max-w-4xl" title={abrir?.nome ?? "Endosso"}>
+          <div className="p-4">{abrir && <PdfViewer key={abrir.id} load={load} nome={abrir.nome} />}</div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function MensagensTab({ c }: { c: ClientDetail }) {
   const { data, isLoading } = useQuery({ queryKey: ["client-messages", c.id], queryFn: () => api.clients.messages(c.id) });
   if (isLoading) return <Skeleton className="h-64" />;
@@ -379,11 +479,17 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
   const [wa, setWa] = useState(false);
   const [editing, setEditing] = useState(false);
   const [attach, setAttach] = useState(false);
+  const [endosso, setEndosso] = useState(false);
   /** undefined = fechado; null = nova apólice; Policy = editar. */
   const [polForm, setPolForm] = useState<Policy | null | undefined>(undefined);
   const [polDel, setPolDel] = useState<Policy | null>(null);
   // Cadastro manual recém-criado: já abre a primeira apólice.
   useEffect(() => {
+    const t = search.get("tab");
+    if (t && ["dados", "apolices", "parcelas", "endossos", "documentos", "sinistros", "mensagens", "timeline"].includes(t)) {
+      setTab(t);
+      window.history.replaceState(null, "", `/app/clientes/${id}`);
+    }
     if (search.get("novo") === "1") {
       setTab("apolices");
       setPolForm(null);
@@ -436,6 +542,9 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
             <Button className="border border-white/15 bg-white/5 text-ivory-50 shadow-none hover:bg-white/10" onClick={() => setEditing(true)}>
               <Pencil /> Editar
             </Button>
+            <Button className="border border-white/15 bg-white/5 text-ivory-50 shadow-none hover:bg-white/10" onClick={() => setEndosso(true)}>
+              <FileSignature /> Subir endosso
+            </Button>
             <Button variant="gold" onClick={() => setWa(true)} disabled={c.optOut}>
               <WhatsAppIcon className="size-4" /> Mensagem
             </Button>
@@ -469,6 +578,7 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
           { value: "dados", label: "Dados" },
           { value: "apolices", label: "Apólices", count: c.apolices.length },
           { value: "parcelas", label: "Parcelas", count: c.parcelas.length },
+          { value: "endossos", label: "Endossos" },
           { value: "documentos", label: "Documentos", count: c.documentos.length },
           { value: "sinistros", label: "Sinistros" },
           { value: "mensagens", label: "Mensagens" },
@@ -484,6 +594,9 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
           </TabsContent>
           <TabsContent value="parcelas">
             <ParcelasTab c={c} />
+          </TabsContent>
+          <TabsContent value="endossos">
+            <EndossosTab c={c} onUpload={() => setEndosso(true)} />
           </TabsContent>
           <TabsContent value="documentos">
             <DocumentosTab c={c} onAttach={() => setAttach(true)} />
@@ -504,6 +617,7 @@ function ClientPageInner({ params }: { params: Promise<{ id: string }> }) {
       <PolicyFormDialog key={polForm === undefined ? "pol-closed" : `pol-${polForm?.id ?? "nova"}`} open={polForm !== undefined} onOpenChange={(o) => !o && setPolForm(undefined)} client={c} policy={polForm} />
       <DeletePolicyDialog policy={polDel} clientId={c.id} onClose={() => setPolDel(null)} />
       <AttachDialog key={attach ? "att-open" : "att-closed"} open={attach} onOpenChange={setAttach} client={c} />
+      <EndorsementDialog open={endosso} onOpenChange={setEndosso} clientId={c.id} onSaved={() => setTab("endossos")} />
 
       <SendWhatsAppDialog
         open={wa}

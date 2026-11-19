@@ -206,6 +206,44 @@ export const ClientFromPdfSchema = z.object({
 });
 export type ClientFromPdfInput = z.infer<typeof ClientFromPdfSchema>;
 
+// ---------------------------------------------------------------- endossos
+/** Campos que um endosso pode alterar (whitelist aplicada pela API). */
+export const ENDORSEMENT_CAMPOS = [
+  "item.placa",
+  "item.modelo",
+  "item.ano",
+  "item.chassi",
+  "policy.condutorPrincipal",
+  "policy.premioTotal",
+  "client.cep",
+  "client.logradouro",
+  "client.bairro",
+  "client.cidade",
+  "client.uf",
+] as const;
+export type EndorsementCampo = (typeof ENDORSEMENT_CAMPOS)[number];
+
+/** Body (campo `data`, JSON) do POST /endorsements — o endosso revisado pelo operador. */
+export const EndorsementCreateSchema = z.object({
+  clientId: z.string().min(1).max(64),
+  policyId: z.string().min(1).max(64),
+  /** Veículo da apólice que o endosso altera (frota); sem ele, o primeiro veículo. */
+  itemId: z.string().min(1).max(64).optional().nullable(),
+  numero: optStr(40),
+  emissao: IsoDateSchema.optional().nullable(),
+  motivos: z.array(z.string().trim().min(1).max(60)).max(12).default([]),
+  premio: z.number().nonnegative().max(10_000_000).optional().nullable(),
+  restituicao: z.boolean().default(false),
+  /** Endosso de cancelamento: a apólice passa para CANCELADA. */
+  cancelar: z.boolean().default(false),
+  alteracoes: z
+    .array(z.object({ campo: z.enum(ENDORSEMENT_CAMPOS), label: z.string().trim().min(1).max(60), depois: z.string().trim().max(200).nullable() }))
+    .max(20)
+    .default([]),
+  observacao: optStr(1000),
+});
+export type EndorsementCreateInput = z.infer<typeof EndorsementCreateSchema>;
+
 // ---------------------------------------------------------------- seguradoras
 export const InsurerUpdateSchema = z.object({
   nome: z.string().trim().min(2).max(80).optional(),

@@ -94,6 +94,7 @@ export function policyDTO(p: Policy & { insurer: Pick<Insurer, "id" | "nome" | "
     status: p.status,
     documentId: p.documentId,
     endossoDeId: p.endossoDeId,
+    condutorPrincipal: p.condutorPrincipal,
     diasParaVencer: fim ? diffDays(todayIso(), fim) : null,
     createdAt: p.createdAt.toISOString(),
   };

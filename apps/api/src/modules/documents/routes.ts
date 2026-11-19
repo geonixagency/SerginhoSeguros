@@ -34,7 +34,7 @@ export function sniffMime(buf: Buffer): { mime: string; ext: string } | null {
 const cleanName = (n: string, fallback: string) => n.replace(/^.*[\\/]/, "").replace(/[\x00-\x1f]/g, "").slice(0, 200) || fallback;
 
 /** Lê o multipart: um arquivo PDF + campos texto opcionais. */
-async function readPdfMultipart(req: FastifyRequest): Promise<{ buf: Buffer; filename: string; fields: Record<string, string> }> {
+export async function readPdfMultipart(req: FastifyRequest): Promise<{ buf: Buffer; filename: string; fields: Record<string, string> }> {
   if (!req.isMultipart()) throw badRequest("Envie o arquivo como multipart/form-data (campo 'file')");
   let buf: Buffer | null = null;
   let filename = "documento.pdf";

@@ -126,6 +126,8 @@ export interface PolicyDTO {
   status: PolicyStatus;
   documentId: string | null;
   endossoDeId: string | null;
+  /** Principal condutor (auto), quando conhecido — atualizado por endosso. */
+  condutorPrincipal?: string | null;
   /** Dias até o fim da vigência (negativo = vencida). */
   diasParaVencer: number | null;
   createdAt: string;
@@ -263,6 +265,81 @@ export interface FromPdfResponse {
   policyId: string;
   documentId: string;
   clienteCriado: boolean;
+}
+
+// ---------------------------------------------------------------- endossos
+export interface EndorsementChangeDTO {
+  campo: string;
+  label: string;
+  antes: string | null;
+  depois: string | null;
+}
+
+/** Apólice do cliente que pode receber o endosso, com o que mudaria se ela for a escolhida. */
+export interface EndorsementPolicyOptionDTO {
+  id: string;
+  numero: string | null;
+  seguradora: string;
+  ramo: string;
+  status: string;
+  placa: string | null;
+  modelo: string | null;
+  itemId: string | null;
+  fimVigencia: string | null;
+  premioTotal: number | null;
+  alteracoes: EndorsementChangeDTO[];
+}
+
+/** POST /endorsements/parse — leitura do PDF de endosso, sem gravar nada. */
+export interface EndorsementPreviewDTO {
+  hash: string;
+  /** Este PDF já foi registrado como endosso (evita lançar duas vezes). */
+  jaRegistrado: boolean;
+  tipoDocumento: string | null;
+  endosso: {
+    numero: string | null;
+    emissao: string | null;
+    motivos: string[];
+    condutor: string | null;
+    premio: number | null;
+    restituicao: boolean;
+    cancelamento: boolean;
+    seguradora: string | null;
+    apoliceNumero: string | null;
+    segurado: string | null;
+    veiculo: { placa: string | null; modelo: string | null; ano: string | null; chassi: string | null } | null;
+  };
+  cliente: { id: string; nome: string } | null;
+  apoliceSugeridaId: string | null;
+  via: "numero" | "chassi" | "placa" | null;
+  apolices: EndorsementPolicyOptionDTO[];
+  avisos: string[];
+}
+
+export interface EndorsementDTO {
+  id: string;
+  clientId: string;
+  policyId: string;
+  apoliceNumero: string | null;
+  seguradora: string;
+  numero: string | null;
+  emissao: string | null;
+  motivos: string[];
+  premio: number | null;
+  restituicao: boolean;
+  cancelou: boolean;
+  alteracoes: EndorsementChangeDTO[];
+  observacao: string | null;
+  documentId: string | null;
+  documentoNome: string | null;
+  autor: string | null;
+  criadoEm: string;
+}
+
+/** GET /clients/:id/endorsements — registrados aqui + PDFs de endosso antigos (importados). */
+export interface ClientEndorsementsDTO {
+  registros: EndorsementDTO[];
+  documentosAntigos: Array<{ id: string; nome: string; policyId: string | null; apoliceNumero: string | null; seguradora: string | null; criadoEm: string }>;
 }
 
 // ---------------------------------------------------------------- ações

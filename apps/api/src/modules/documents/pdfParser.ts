@@ -28,6 +28,15 @@ export interface ParserOutput {
   paginas: number;
   tipoDocumento?: string | null;
   endossoCancelamento?: boolean;
+  /** Só em endosso: o que é próprio dele (ver services/pdf-parser/app/extractor/endorsement.py). */
+  endosso?: {
+    numero: string | null;
+    motivos: string[];
+    condutor: string | null;
+    premio: number | null;
+    restituicao: boolean;
+    endereco?: { endereco: string | null; bairro: string | null; cidade: string | null; uf: string | null; cep: string | null };
+  } | null;
 }
 
 export async function callPdfParser(pdf: Buffer, filename: string): Promise<ParserOutput> {

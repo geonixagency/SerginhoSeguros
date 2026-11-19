@@ -40,6 +40,7 @@ import type {
   UserDTO,
 } from "@ss/shared";
 import { http, qs, fetchFileUrl } from "./client";
+import { endorsementsApi } from "./endorsements";
 import type {
   PortalAccess,
   PatchCredentialInput,
@@ -175,6 +176,7 @@ function policy(p: PolicyDetailDTO | PolicyListItemDTO, client: { id: string; no
         }
       : null,
     documentId: p.documentId,
+    condutor: p.condutorPrincipal ?? null,
   };
 }
 
@@ -839,6 +841,7 @@ export const realApi = {
     create: async (data: ClientInput): Promise<ClientDetail> => clientDetail(await http.post<ClientDetailDTO>("/clients", { ...clientBody(data), origem: "MANUAL" })),
     edit: async (id: string, data: ClientInput): Promise<ClientDetail> => clientDetail(await http.patch<ClientDetailDTO>(`/clients/${id}`, clientBody(data))),
   },
+  endorsements: endorsementsApi,
   documents: {
     parse: async (file: File): Promise<ParseResult> => {
       const fd = new FormData();

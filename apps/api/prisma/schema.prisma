@@ -154,32 +154,33 @@ model RefreshToken {
 }
 
 model Client {
-  id          String       @id @default(cuid())
-  nome        String
+  id           String        @id @default(cuid())
+  nome         String
   /// Só dígitos (11 = CPF, 14 = CNPJ).
-  cpfCnpj     String       @map("cpf_cnpj")
+  cpfCnpj      String        @map("cpf_cnpj")
   /// Pasta de origem na base do corretor: identifica o cliente na importação (o CPF pode repetir, ex.: esposa com apólice no CPF do marido).
-  pasta       String?      @unique
-  nascimento  DateTime?    @db.Date
-  cnh         String?
+  pasta        String?       @unique
+  nascimento   DateTime?     @db.Date
+  cnh          String?
   /// Só dígitos, DDD + número.
-  telefone    String?
-  email       String?
-  endereco    Json?
-  status      ClientStatus @default(INATIVO)
-  origem      String?
-  optOut      Boolean      @default(false) @map("opt_out")
-  optOutEm    DateTime?    @map("opt_out_em")
-  observacoes String?
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  policies    Policy[]
-  documents   Document[]
-  messages    Message[]
-  quotes      Quote[]
-  leads       Lead[]
-  tasks       Task[]
-  claims      Claim[]
+  telefone     String?
+  email        String?
+  endereco     Json?
+  status       ClientStatus  @default(INATIVO)
+  origem       String?
+  optOut       Boolean       @default(false) @map("opt_out")
+  optOutEm     DateTime?     @map("opt_out_em")
+  observacoes  String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  policies     Policy[]
+  documents    Document[]
+  messages     Message[]
+  quotes       Quote[]
+  leads        Lead[]
+  tasks        Task[]
+  claims       Claim[]
+  endorsements Endorsement[]
 
   @@index([cpfCnpj])
   @@index([nome])
@@ -229,32 +230,35 @@ model InsurerCredential {
 }
 
 model Policy {
-  id             String         @id @default(cuid())
-  clientId       String         @map("client_id")
-  client         Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  insurerId      String         @map("insurer_id")
-  insurer        Insurer        @relation(fields: [insurerId], references: [id])
-  ramo           String
-  numero         String?
-  proposta       String?
-  emissao        DateTime?      @db.Date
-  inicioVigencia DateTime?      @map("inicio_vigencia") @db.Date
-  fimVigencia    DateTime?      @map("fim_vigencia") @db.Date
-  premioTotal    Decimal?       @map("premio_total") @db.Decimal(12, 2)
-  formaPagamento FormaPagamento @default(OUTRO) @map("forma_pagamento")
-  status         PolicyStatus   @default(VIGENTE)
+  id                String         @id @default(cuid())
+  clientId          String         @map("client_id")
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  insurerId         String         @map("insurer_id")
+  insurer           Insurer        @relation(fields: [insurerId], references: [id])
+  ramo              String
+  numero            String?
+  proposta          String?
+  emissao           DateTime?      @db.Date
+  inicioVigencia    DateTime?      @map("inicio_vigencia") @db.Date
+  fimVigencia       DateTime?      @map("fim_vigencia") @db.Date
+  premioTotal       Decimal?       @map("premio_total") @db.Decimal(12, 2)
+  formaPagamento    FormaPagamento @default(OUTRO) @map("forma_pagamento")
+  status            PolicyStatus   @default(VIGENTE)
+  /// Principal condutor (auto); costuma mudar por endosso.
+  condutorPrincipal String?        @map("condutor_principal")
   /// PDF principal da apólice.
-  documentId     String?        @unique @map("document_id")
-  document       Document?      @relation("PolicyMainDocument", fields: [documentId], references: [id], onDelete: SetNull)
-  endossoDeId    String?        @map("endosso_de_id")
-  endossoDe      Policy?        @relation("Endossos", fields: [endossoDeId], references: [id], onDelete: SetNull)
-  endossos       Policy[]       @relation("Endossos")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  installments   Installment[]
-  items          InsuredItem[]
-  documents      Document[]     @relation("PolicyDocuments")
-  claims         Claim[]
+  documentId        String?        @unique @map("document_id")
+  document          Document?      @relation("PolicyMainDocument", fields: [documentId], references: [id], onDelete: SetNull)
+  endossoDeId       String?        @map("endosso_de_id")
+  endossoDe         Policy?        @relation("Endossos", fields: [endossoDeId], references: [id], onDelete: SetNull)
+  endossos          Policy[]       @relation("Endossos")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  installments      Installment[]
+  items             InsuredItem[]
+  documents         Document[]     @relation("PolicyDocuments")
+  claims            Claim[]
+  endorsements      Endorsement[]
 
   @@index([clientId])
   @@index([insurerId])
@@ -318,6 +322,7 @@ model Document {
   createdAt   DateTime     @default(now()) @map("created_at")
   mainOf      Policy?      @relation("PolicyMainDocument")
   messages    Message[]
+  endorsement Endorsement?
 
   @@index([hash])
   @@index([clientId])
@@ -506,6 +511,33 @@ model Claim {
   @@index([policyId])
   @@index([dataOcorrencia])
   @@map("claims")
+}
+
+/// Endosso registrado: o que mudou na apólice (antes/depois), com o PDF guardado no cliente.
+model Endorsement {
+  id          String    @id @default(cuid())
+  clientId    String    @map("client_id")
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  policyId    String    @map("policy_id")
+  policy      Policy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  documentId  String?   @unique @map("document_id")
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  numero      String?
+  emissao     DateTime? @db.Date
+  motivos     String[]
+  /// Valor cobrado (ou devolvido, se restituicao) pelo endosso.
+  premio      Decimal?  @db.Decimal(12, 2)
+  restituicao Boolean   @default(false)
+  cancelou    Boolean   @default(false)
+  /// [{ campo, label, antes, depois }]
+  alteracoes  Json
+  observacao  String?
+  userId      String?   @map("user_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([clientId])
+  @@index([policyId])
+  @@map("endorsements")
 }
 
 model AuditLog {

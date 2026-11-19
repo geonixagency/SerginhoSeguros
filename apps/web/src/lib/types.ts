@@ -275,6 +275,8 @@ export interface Policy {
   status: PolicyStatus;
   item: InsuredItem | null;
   documentId: string | null;
+  /** Principal condutor (atualizado por endosso). */
+  condutor?: string | null;
 }
 
 export type InstallmentStatus = "PENDENTE" | "PAGO" | "ATRASADO" | "FALHOU";

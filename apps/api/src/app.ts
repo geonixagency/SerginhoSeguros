@@ -25,6 +25,7 @@ import quoteRoutes from "./modules/quotes/routes";
 import claimRoutes from "./modules/claims/routes";
 import taskRoutes from "./modules/tasks/routes";
 import importRoutes from "./modules/importacao/routes";
+import endorsementRoutes from "./modules/endorsements/routes";
 import { webhookRoutes } from "./modules/messaging/webhook";
 
 export async function buildApp() {
@@ -89,6 +90,7 @@ export async function buildApp() {
         await priv.register(actionRoutes, { prefix: "/clients" });
         await priv.register(documentRoutes);
         await priv.register(policyRoutes);
+        await priv.register(endorsementRoutes);
         await priv.register(insurerRoutes, { prefix: "/insurers" });
         await priv.register(messagingRoutes, { prefix: "/messaging" });
         await priv.register(leadRoutes, { prefix: "/leads" });
