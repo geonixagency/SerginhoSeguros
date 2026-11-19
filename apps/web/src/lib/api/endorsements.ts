@@ -1,4 +1,4 @@
-// Endossos: mesma chamada no modo real e no de demonstração (o demo responde "indisponível").
+// Endossos: mesma chamada no modo real e no de demonstração (no demo a rota não existe e a tela mostra o erro).
 import type { ClientEndorsementsDTO, EndorsementCreateInput, EndorsementDTO, EndorsementPreviewDTO } from "@ss/shared";
 import { http } from "./client";
 
