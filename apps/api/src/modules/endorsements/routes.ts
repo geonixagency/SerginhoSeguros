@@ -272,12 +272,21 @@ export default async function endorsementRoutes(app: FastifyInstance) {
     const policy = await prisma.policy.findFirst({ where: { id: input.policyId, clientId: input.clientId }, select: POLICY_SELECT });
     if (!policy) throw badRequest("Apólice não pertence a este cliente");
     const hash = sha256(buf);
-    const docExistente = await prisma.document.findFirst({
+    const porHash = await prisma.document.findFirst({
       where: { hash, clientId: input.clientId },
       select: { id: true, endorsement: { select: { id: true } } },
       orderBy: { createdAt: "asc" },
     });
-    if (docExistente?.endorsement) throw conflict("Este endosso já foi registrado para este cliente");
+    if (porHash?.endorsement) throw conflict("Este endosso já foi registrado para este cliente");
+    // Mesmo PDF baixado de novo (bytes diferentes): o endosso importado com o mesmo nome, ainda
+    // sem registro, é reaproveitado em vez de virar uma cópia a mais na aba Documentos.
+    const docExistente =
+      porHash ??
+      (await prisma.document.findFirst({
+        where: { clientId: input.clientId, tipo: "ENDOSSO", nomeArquivo: filename, endorsement: null, OR: [{ policyId: policy.id }, { policyId: null }] },
+        select: { id: true, endorsement: { select: { id: true } } },
+        orderBy: { createdAt: "asc" },
+      }));
     const file = docExistente ? null : await saveUpload(buf);
 
     const result = await prisma.$transaction(async (tx) => {
